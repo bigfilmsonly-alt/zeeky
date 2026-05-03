@@ -11,7 +11,7 @@ export default function AppHome() {
 
       {/* Primary CTA — Analyze a Song */}
       <Link
-        href="/app/studio"
+        href="/app/score"
         className="block rounded-2xl bg-gradient-to-br from-accent-purple via-accent-blue to-accent-cyan p-4 active:scale-[0.98] transition-transform"
       >
         <div className="flex items-center gap-3">
