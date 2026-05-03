@@ -47,6 +47,36 @@ interface Sample {
   market:{hit:number;conf:string;demo:string;reach:string;cities:{n:string;v:string}[]};
 }
 
+// iTunes artwork cache
+const artCache = new Map<string, string>();
+async function fetchArtwork(track: string, artist: string): Promise<string> {
+  const key = `${track}|${artist}`;
+  if (artCache.has(key)) return artCache.get(key)!;
+  try {
+    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(track+" "+artist)}&entity=song&limit=1`);
+    const data = await res.json();
+    const url = data.results?.[0]?.artworkUrl100?.replace("100x100", "300x300") || "";
+    if (url) artCache.set(key, url);
+    return url;
+  } catch { return ""; }
+}
+
+// iTunes preview URL cache
+const previewCache = new Map<string, string>();
+async function fetchPreview(track: string, artist: string): Promise<string> {
+  const key = `${track}|${artist}`;
+  if (previewCache.has(key)) return previewCache.get(key)!;
+  try {
+    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(track+" "+artist)}&entity=song&limit=1`);
+    const data = await res.json();
+    const url = data.results?.[0]?.previewUrl || "";
+    const art = data.results?.[0]?.artworkUrl100?.replace("100x100", "300x300") || "";
+    if (url) previewCache.set(key, url);
+    if (art) artCache.set(key, art);
+    return url;
+  } catch { return ""; }
+}
+
 const APPLE_ICON = <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>;
 
 export default function ZeekyPage() {
@@ -59,15 +89,79 @@ export default function ZeekyPage() {
   const [latency, setLatency] = useState(117);
   const [analyzeStep, setAnalyzeStep] = useState("");
   const [toast, setToast] = useState<string|null>(null);
-  const [b2cPlaying, setB2cPlaying] = useState(true);
-  const [b2cProgress, setB2cProgress] = useState(27);
+  const [b2cPlaying, setB2cPlaying] = useState(false);
+  const [b2cProgress, setB2cProgress] = useState(0);
   const [genreAnimated, setGenreAnimated] = useState(true);
+  const [displayScore, setDisplayScore] = useState(87);
+  const [artworks, setArtworks] = useState<Record<string,string>>({});
+  const [nowPlaying, setNowPlaying] = useState<{track:string;artist:string}|null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const audioRef = useRef<HTMLAudioElement|null>(null);
+
+  // Init audio element
+  useEffect(() => {
+    audioRef.current = new Audio();
+    audioRef.current.addEventListener("ended", () => { setB2cPlaying(false); setB2cProgress(0); });
+    audioRef.current.addEventListener("timeupdate", () => {
+      const a = audioRef.current!;
+      if (a.duration) setB2cProgress((a.currentTime / a.duration) * 100);
+    });
+    return () => { audioRef.current?.pause(); };
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
+      if (e.code === "Space") { e.preventDefault(); toggleAudio(); }
+      if (e.code === "ArrowRight") { e.preventDefault(); const keys = Object.keys(SAMPLES); const cur = keys.indexOf(sampleKey); const next = keys[(cur+1)%keys.length]; loadSample(next); }
+      if (e.code === "ArrowLeft") { e.preventDefault(); const keys = Object.keys(SAMPLES); const cur = keys.indexOf(sampleKey); const prev = keys[(cur-1+keys.length)%keys.length]; loadSample(prev); }
+      if (e.code === "Tab") { e.preventDefault(); const tabs = ["neighbors","radar","genres","market","json"]; const cur = tabs.indexOf(resultsTab); setResultsTab(tabs[(cur+1)%tabs.length]); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+
+  // Fetch artworks for current sample neighbors
+  useEffect(() => {
+    sample.neighbors.forEach(n => {
+      fetchArtwork(n.t, n.a).then(url => {
+        if (url) setArtworks(prev => ({ ...prev, [`${n.t}|${n.a}`]: url }));
+      });
+    });
+    fetchArtwork(sample.track, sample.artist).then(url => {
+      if (url) setArtworks(prev => ({ ...prev, [`${sample.track}|${sample.artist}`]: url }));
+    });
+  }, [sample]);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2000);
+  }, []);
+
+  const playTrack = useCallback(async (track: string, artist: string) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setNowPlaying({ track, artist });
+    showToast(`Loading "${track}"\u2026`);
+    const url = await fetchPreview(track, artist);
+    if (url) {
+      audio.src = url;
+      audio.play().catch(() => {});
+      setB2cPlaying(true);
+      setB2cProgress(0);
+      showToast(`Now playing: ${track}`);
+    } else {
+      showToast(`Preview not available for "${track}"`);
+    }
+  }, [showToast]);
+
+  const toggleAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) { audio.play().catch(() => {}); setB2cPlaying(true); }
+    else { audio.pause(); setB2cPlaying(false); }
   }, []);
 
   const openApple = useCallback((track: string, artist: string) => {
@@ -85,6 +179,15 @@ export default function ZeekyPage() {
       clearInterval(iv); setIsAnalyzing(false); setShowResults(true); setSample(s);
       setLatency(90 + Math.floor(Math.random() * 50));
       setTimeout(() => setGenreAnimated(true), 50);
+      // Animated score counter
+      let frame = 0; const target = s.score; const dur = 40;
+      const counter = setInterval(() => {
+        frame++;
+        const progress = Math.min(frame / dur, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setDisplayScore(Math.round(eased * target));
+        if (frame >= dur) clearInterval(counter);
+      }, 20);
     }, 1400);
   }, [isAnalyzing]);
 
@@ -92,14 +195,10 @@ export default function ZeekyPage() {
     setSampleKey(key); runAnalysis(SAMPLES[key] || SAMPLES.scarface);
   }, [runAnalysis]);
 
-  useEffect(() => {
-    if (mode !== "b2c" || !b2cPlaying) return;
-    const iv = setInterval(() => setB2cProgress(p => (p + 0.5) % 100), 300);
-    return () => clearInterval(iv);
-  }, [mode, b2cPlaying]);
-
   const curTime = Math.floor((b2cProgress / 100) * 30);
   const remTime = 30 - curTime;
+
+  const getArt = (track: string, artist: string) => artworks[`${track}|${artist}`] || "";
   const radarKeys = Object.keys(sample.radarPcts);
   const radarPoints = radarKeys.map((_, i) => {
     const angle = (i / radarKeys.length) * Math.PI * 2 - Math.PI / 2;
@@ -141,9 +240,9 @@ export default function ZeekyPage() {
           </div>
           {isAnalyzing && <div className="analyzing"><div className="analyzing-bars">{Array.from({length:7},(_,i)=><div key={i} className="analyzing-bar" style={{animationDelay:`${i*0.1}s`}}/>)}</div><div className="analyzing-text">&#x25B8; EXTRACTING 84 ATTRIBUTES</div><div className="analyzing-step">{analyzeStep}</div></div>}
           {showResults && !isAnalyzing && <div className="results">
-            <div className="results-header"><div className="results-art"><div className={`art ${sample.art}`}/></div><div className="results-meta"><div className="results-track">{sample.track}</div><div className="results-artist">{sample.artist} · {sample.album}</div></div><div className="results-score"><div className="results-score-num">{sample.score}</div><div className="results-score-label">DNA Match</div></div></div>
+            <div className="results-header"><div className="results-art">{getArt(sample.track,sample.artist)?<img src={getArt(sample.track,sample.artist)} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:8}}/>:<div className={`art ${sample.art}`}/>}</div><div className="results-meta"><div className="results-track">{sample.track}</div><div className="results-artist">{sample.artist} · {sample.album}</div></div><div className="results-score"><div className="results-score-num">{displayScore}</div><div className="results-score-label">DNA Match</div></div></div>
             <div className="results-tabs">{["neighbors","radar","genres","market","json"].map(t=><button key={t} className={`results-tab ${resultsTab===t?"active":""}`} onClick={()=>{setResultsTab(t);if(t==="genres")setTimeout(()=>setGenreAnimated(true),50);}}>{t==="json"?"API Response":t.charAt(0).toUpperCase()+t.slice(1)}</button>)}</div>
-            {resultsTab==="neighbors"&&<div className="neighbors">{sample.neighbors.map((n,i)=><div key={i} className="neighbor"><div className="neighbor-rank">{String(i+1).padStart(2,"0")}</div><div className="neighbor-art"><div className={`art ${n.art}`}/></div><div className="neighbor-info"><div className="neighbor-title">{n.t}</div><div className="neighbor-artist">{n.a}</div></div><div className="neighbor-bar"><div className="neighbor-bar-fill" style={{width:`${n.p}%`}}/></div><div className="neighbor-pct">{n.p.toFixed(1)}%</div><button className="neighbor-apple" onClick={()=>openApple(n.t,n.a)}><svg viewBox="0 0 24 24" fill="currentColor">{APPLE_ICON}</svg></button></div>)}</div>}
+            {resultsTab==="neighbors"&&<div className="neighbors">{sample.neighbors.map((n,i)=><div key={i} className="neighbor" onClick={()=>playTrack(n.t,n.a)} style={{cursor:"pointer"}}><div className="neighbor-rank">{nowPlaying?.track===n.t?<span style={{color:"var(--blue-2)"}}>&#9654;</span>:String(i+1).padStart(2,"0")}</div><div className="neighbor-art">{getArt(n.t,n.a)?<img src={getArt(n.t,n.a)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className={`art ${n.art}`}/>}</div><div className="neighbor-info"><div className="neighbor-title" style={nowPlaying?.track===n.t?{color:"var(--blue-2)"}:undefined}>{n.t}</div><div className="neighbor-artist">{n.a}</div></div><div className="neighbor-bar"><div className="neighbor-bar-fill" style={{width:`${n.p}%`}}/></div><div className="neighbor-pct">{n.p.toFixed(1)}%</div><button className="neighbor-apple" onClick={(e)=>{e.stopPropagation();openApple(n.t,n.a);}}><svg viewBox="0 0 24 24" fill="currentColor">{APPLE_ICON}</svg></button></div>)}</div>}
             {resultsTab==="radar"&&<div className="radar-wrap"><svg className="radar-svg" viewBox="0 0 320 240"><defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#4a90e2" stopOpacity="0.6"/><stop offset="100%" stopColor="#9b51e0" stopOpacity="0.1"/></radialGradient></defs><g stroke="rgba(255,255,255,0.08)" fill="none">{[100,75,50,25].map(r=><circle key={r} cx="160" cy="120" r={r}/>)}</g><polygon points={radarPoints.map(p=>p.join(",")).join(" ")} fill="url(#rg)" stroke="#4a90e2" strokeWidth="1.5"/>{radarPoints.map(([x,y],i)=><circle key={i} cx={x} cy={y} r="3" fill="#4a90e2"/>)}{radarKeys.map((k,i)=>{const a=(i/radarKeys.length)*Math.PI*2-Math.PI/2;return<text key={k} x={160+115*Math.cos(a)} y={120+115*Math.sin(a)} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.65)" fontFamily="JetBrains Mono,monospace" fontSize="9" fontWeight="500">{k}</text>})}</svg><div className="radar-legend">{Object.entries(sample.radarPcts).map(([k,v])=><div key={k} className="radar-attr"><span className="radar-attr-name">{k}</span><span className="radar-attr-val">{v}%</span></div>)}</div></div>}
             {resultsTab==="genres"&&<div className="genres">{sample.genres.map(g=><div key={g.n} className="genre-bar"><div className="genre-label">{g.n}</div><div className="genre-bar-track"><div className="genre-bar-fill" style={{width:genreAnimated?`${g.p}%`:"0",background:g.c,transition:"width 0.8s cubic-bezier(0.2,0.8,0.2,1)"}}/></div><div className="genre-pct">{g.p}%</div></div>)}</div>}
             {resultsTab==="market"&&<div className="market"><div className="market-grid"><div className="market-stat"><div className="market-stat-label">Hit Score</div><div className="market-stat-val">{sample.market.hit}%</div></div><div className="market-stat"><div className="market-stat-label">Confidence</div><div className="market-stat-val">{sample.market.conf}</div></div><div className="market-stat"><div className="market-stat-label">Core Demo</div><div className="market-stat-val">{sample.market.demo}</div></div><div className="market-stat"><div className="market-stat-label">Reach</div><div className="market-stat-val">{sample.market.reach}</div></div></div><div className="input-label" style={{marginTop:14}}>&#x25B8; TOP CITIES</div>{sample.market.cities.map((c,i)=><div key={c.n} className="market-city"><div className="market-city-rank">{i+1}</div><div className="market-city-name">{c.n}</div><div className="market-city-num">{c.v}</div></div>)}</div>}
@@ -154,19 +253,19 @@ export default function ZeekyPage() {
 
         {/* B2C PLAYER */}
         {mode==="b2c"&&<div className="b2c-player">
-          <div className={`b2c-art ${b2cPlaying?"playing":""}`}><div className={`art ${sample.art}`}/><div className="b2c-art-overlay"><div className="b2c-art-eyebrow"><span className="dot"/><span>NOW PLAYING · DNA SCORE {sample.score}%</span></div><div className="b2c-art-title">{sample.track}</div><div className="b2c-art-artist">{sample.artist} · {sample.album}</div></div></div>
+          <div className={`b2c-art ${b2cPlaying?"playing":""}`} onClick={()=>playTrack(sample.track,sample.artist)} style={{cursor:"pointer"}}>{getArt(sample.track,sample.artist)?<img src={getArt(sample.track,sample.artist)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className={`art ${sample.art}`}/>}<div className="b2c-art-overlay"><div className="b2c-art-eyebrow"><span className="dot"/><span>NOW PLAYING · DNA SCORE {sample.score}%</span></div><div className="b2c-art-title">{sample.track}</div><div className="b2c-art-artist">{sample.artist} · {sample.album}</div></div></div>
           <div className="b2c-controls">
             <div className="b2c-progress" onClick={e=>{const r=e.currentTarget.getBoundingClientRect();setB2cProgress(((e.clientX-r.left)/r.width)*100);}}><div className="b2c-progress-fill" style={{width:`${b2cProgress}%`}}/></div>
             <div className="b2c-times"><span>0:{String(curTime).padStart(2,"0")}</span><span>&minus;0:{String(remTime).padStart(2,"0")}</span></div>
             <div className="b2c-preview-tag">&#x25B8; FREE 30-SECOND PREVIEW</div>
             <div className="b2c-transport">
               <button className="b2c-transport-btn" onClick={()=>setB2cProgress(p=>Math.max(0,p-25))}><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
-              <button className="b2c-play" onClick={()=>setB2cPlaying(!b2cPlaying)}><svg viewBox="0 0 24 24" fill="currentColor">{b2cPlaying?<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>:<path d="M8 5v14l11-7z"/>}</svg></button>
+              <button className="b2c-play" onClick={()=>{if(!nowPlaying)playTrack(sample.track,sample.artist);else toggleAudio();}}><svg viewBox="0 0 24 24" fill="currentColor">{b2cPlaying?<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>:<path d="M8 5v14l11-7z"/>}</svg></button>
               <button className="b2c-transport-btn" onClick={()=>{const keys=Object.keys(SAMPLES);const cur=keys.indexOf(sampleKey);const next=keys[(cur+1)%keys.length];setSampleKey(next);setSample(SAMPLES[next]);setB2cProgress(0);}}><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
             </div>
             <button className="b2c-apple" onClick={()=>openApple(sample.track,sample.artist)}><div className="b2c-apple-icon"><svg viewBox="0 0 24 24" fill="currentColor">{APPLE_ICON}</svg></div><div className="b2c-apple-meta"><div className="b2c-apple-eyebrow">PLAY FULL TRACK</div><div className="b2c-apple-title">Open in Apple Music</div></div><div className="b2c-apple-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></button>
           </div>
-          <div className="b2c-queue"><div className="b2c-queue-h">UP NEXT · DNA QUEUE</div>{sample.neighbors.slice(0,5).map((n,i)=><div key={i} className="queue-track"><div className="queue-track-main" onClick={()=>{setSample({...sample,track:n.t,artist:n.a,art:n.art,score:Math.round(n.p),album:"Apple Music"});setB2cProgress(0);}}><div className="queue-art"><div className={`art ${n.art}`}/></div><div className="queue-info"><div className="queue-title">{n.t}</div><div className="queue-artist">{n.a}</div></div><div className="queue-pct">{n.p.toFixed(0)}%</div></div><button className="queue-apple" onClick={()=>openApple(n.t,n.a)}><svg viewBox="0 0 24 24" fill="currentColor">{APPLE_ICON}</svg></button></div>)}</div>
+          <div className="b2c-queue"><div className="b2c-queue-h">UP NEXT · DNA QUEUE</div>{sample.neighbors.slice(0,5).map((n,i)=><div key={i} className="queue-track"><div className="queue-track-main" onClick={()=>{setSample({...sample,track:n.t,artist:n.a,art:n.art,score:Math.round(n.p),album:"Apple Music"});playTrack(n.t,n.a);}}><div className="queue-art">{getArt(n.t,n.a)?<img src={getArt(n.t,n.a)} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:5}}/>:<div className={`art ${n.art}`}/>}</div><div className="queue-info"><div className="queue-title">{n.t}</div><div className="queue-artist">{n.a}</div></div><div className="queue-pct">{n.p.toFixed(0)}%</div></div><button className="queue-apple" onClick={()=>openApple(n.t,n.a)}><svg viewBox="0 0 24 24" fill="currentColor">{APPLE_ICON}</svg></button></div>)}</div>
         </div>}
 
         {/* ENGINE */}
@@ -209,6 +308,23 @@ export default function ZeekyPage() {
         {/* FOOTER */}
         <footer><div className="footer-meta">&copy; 2026 ZEEKY ENTERTAINMENT INC.<br/>PATENTED HITLAB AI · LICENSED GLOBALLY<br/><span style={{color:"var(--acid)"}}>&#x25CF;</span> API STATUS: OPERATIONAL</div></footer>
       </div>
+
+      {/* STICKY MINI PLAYER */}
+      {nowPlaying && (
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"rgba(5,5,7,0.92)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderTop:"1px solid var(--line)",padding:"8px 14px",display:"flex",alignItems:"center",gap:10,maxWidth:480,margin:"0 auto"}}>
+          <div style={{width:40,height:40,borderRadius:6,overflow:"hidden",flexShrink:0}}>{getArt(nowPlaying.track,nowPlaying.artist)?<img src={getArt(nowPlaying.track,nowPlaying.artist)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className="art art-scarface" style={{width:40,height:40}}/>}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nowPlaying.track}</div>
+            <div style={{fontSize:10,color:"var(--muted)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nowPlaying.artist}</div>
+          </div>
+          <button onClick={toggleAudio} style={{width:32,height:32,borderRadius:"50%",background:"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg viewBox="0 0 24 24" fill="currentColor" style={{width:16,height:16}}>{b2cPlaying?<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>:<path d="M8 5v14l11-7z"/>}</svg>
+          </button>
+          <button onClick={()=>openApple(nowPlaying.track,nowPlaying.artist)} style={{width:32,height:32,borderRadius:7,background:"linear-gradient(135deg,#fa233b,#ff5e3a)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 6px rgba(250,35,59,0.3)"}}>
+            <svg viewBox="0 0 24 24" fill="currentColor" style={{width:14,height:14}}>{APPLE_ICON}</svg>
+          </button>
+        </div>
+      )}
 
       {/* TOAST */}
       <div className={`toast ${toast?"show":""}`}><svg viewBox="0 0 24 24" fill="currentColor">{APPLE_ICON}</svg><span>{toast}</span></div>
