@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import IPhoneFrame from "@/components/IPhoneFrame";
-import { PlayerProvider } from "@/lib/player-context";
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,16 +19,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ZEEKY Entertainment | AI Powered Music Intelligence",
+  title: "Zeeky | Audio-DNA Recommendation Engine for DSPs",
   description:
-    "Zeeky Entertainment Inc. is a music and technology company providing innovative AI solutions for the creation, identification and recommendation of hits.",
+    "Zeeky is a patented audio-DNA engine that powers smarter discovery and higher retention for streaming platforms. 84 attributes. 100M+ songs. Drop-in API.",
   keywords: [
     "Zeeky",
-    "AI music",
-    "hit prediction",
+    "audio DNA",
+    "recommendation engine",
+    "DSP",
+    "music streaming",
     "music recommendation",
-    "DNA technology",
-    "digital nuance analysis",
+    "API",
+    "Spotify",
+    "Apple Music",
   ],
   appleWebApp: {
     capable: true,
@@ -38,7 +45,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#050510",
+  themeColor: "#050507",
 };
 
 export default function RootLayout({
@@ -49,12 +56,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
     >
-      <body className="h-full overflow-hidden">
-        <PlayerProvider>
-          <IPhoneFrame>{children}</IPhoneFrame>
-        </PlayerProvider>
+      <body className="min-h-screen bg-[#050507] text-white">
+        {children}
       </body>
     </html>
   );

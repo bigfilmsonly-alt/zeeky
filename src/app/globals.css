@@ -1,54 +1,56 @@
 @import "tailwindcss";
 
 :root {
-  --background: #050510;
+  --background: #050507;
   --foreground: #ededed;
-  --accent-purple: #8b5cf6;
-  --accent-blue: #3b82f6;
-  --accent-cyan: #06b6d4;
-  --surface: #0f0f2a;
-  --surface-light: #1a1a3e;
-  --text-muted: #94a3b8;
+  --blue: #4a90e2;
+  --violet: #9b51e0;
+  --apple-red: #fa233b;
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --line: rgba(255, 255, 255, 0.08);
+  --surface: #0a0a0f;
+  --surface-light: #111116;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-accent-purple: var(--accent-purple);
-  --color-accent-blue: var(--accent-blue);
-  --color-accent-cyan: var(--accent-cyan);
+  --color-blue: var(--blue);
+  --color-violet: var(--violet);
+  --color-apple-red: var(--apple-red);
+  --color-text-muted: var(--text-muted);
+  --color-line: var(--line);
   --color-surface: var(--surface);
   --color-surface-light: var(--surface-light);
-  --color-text-muted: var(--text-muted);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 body {
-  background: #000;
+  background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
 html {
   scroll-behavior: smooth;
 }
 
-/* Gradient text utility */
+/* Gradient text: blue -> violet */
 .gradient-text {
-  background: linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4);
+  background: linear-gradient(135deg, #4a90e2, #9b51e0);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Glow effect */
-.glow-purple {
-  box-shadow: 0 0 40px rgba(139, 92, 246, 0.3), 0 0 80px rgba(139, 92, 246, 0.1);
+/* Glow effects */
+.glow-blue {
+  box-shadow: 0 0 40px rgba(74, 144, 226, 0.25), 0 0 80px rgba(74, 144, 226, 0.08);
 }
 
-.glow-blue {
-  box-shadow: 0 0 40px rgba(59, 130, 246, 0.3), 0 0 80px rgba(59, 130, 246, 0.1);
+.glow-violet {
+  box-shadow: 0 0 40px rgba(155, 81, 224, 0.25), 0 0 80px rgba(155, 81, 224, 0.08);
 }
 
 /* Animated gradient background */
@@ -62,100 +64,52 @@ html {
   animation: gradient-shift 8s ease infinite;
 }
 
-/* Fade in animation */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.8s ease-out forwards;
-}
-
-/* Pulse glow */
+/* Pulse glow for status pill */
 @keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; }
+  0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
 
 .animate-pulse-glow {
-  animation: pulse-glow 3s ease-in-out infinite;
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Cube breathing animation for Company section */
-@keyframes cube-breathe {
-  0%, 100% { opacity: 0.15; }
-  50% { opacity: 0.7; }
+/* Ticker scroll */
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
-/* Section divider gradient line */
+.animate-ticker {
+  animation: ticker-scroll 20s linear infinite;
+}
+
+/* Section divider */
 .section-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, #8b5cf6, #3b82f6, transparent);
+  background: linear-gradient(90deg, transparent, rgba(74, 144, 226, 0.4), rgba(155, 81, 224, 0.4), transparent);
 }
 
-/* Hide scrollbars globally (iPhone frame manages scroll) */
-::-webkit-scrollbar {
-  display: none;
-}
-* {
-  scrollbar-width: none;
+/* Card hover lift */
+.card-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Radar chart styles */
-.radar-ring {
-  fill: none;
-  stroke: rgba(139, 92, 246, 0.15);
-  stroke-width: 1;
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(74, 144, 226, 0.15), 0 0 40px rgba(155, 81, 224, 0.08);
 }
 
-.radar-axis {
-  stroke: rgba(139, 92, 246, 0.1);
-  stroke-width: 1;
+/* Glass card */
+.glass-card {
+  background: rgba(10, 10, 15, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
 }
 
-.radar-area {
-  fill: rgba(139, 92, 246, 0.2);
-  stroke: #8b5cf6;
-  stroke-width: 2;
-}
-
-/* Range slider styling */
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #8b5cf6;
-  cursor: pointer;
-  border: 2px solid #050510;
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #8b5cf6;
-  cursor: pointer;
-  border: 2px solid #050510;
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
-}
-
-/* Select dropdown styling */
-select option {
-  background: #0f0f2a;
-  color: #ededed;
-}
-
-/* ============ iPhone 17 Pro Max Frame ============ */
+/* ============ iPhone 17 Pro Max Frame (for /listen routes only) ============ */
 
 .iphone-page {
   height: 100vh;
@@ -174,7 +128,7 @@ select option {
   left: 25%;
   width: 500px;
   height: 500px;
-  background: rgba(139, 92, 246, 0.06);
+  background: rgba(74, 144, 226, 0.06);
   border-radius: 50%;
   filter: blur(150px);
   pointer-events: none;
@@ -186,7 +140,7 @@ select option {
   right: 25%;
   width: 400px;
   height: 400px;
-  background: rgba(59, 130, 246, 0.04);
+  background: rgba(155, 81, 224, 0.04);
   border-radius: 50%;
   filter: blur(150px);
   pointer-events: none;
@@ -256,32 +210,8 @@ select option {
   padding-top: 46px;
 }
 
-/* Fade-in for page content on navigation */
-.iphone-content > * {
-  animation: page-enter 0.2s ease-out;
-}
-
-@keyframes page-enter {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 .iphone-content::-webkit-scrollbar {
   display: none;
-}
-
-/* Mini music player above tab bar */
-.iphone-miniplayer {
-  display: flex;
-  align-items: center;
-  padding: 6px 12px;
-  background: rgba(15, 15, 42, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 0.5px solid rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
-  position: relative;
-  gap: 8px;
 }
 
 .iphone-tabbar {
@@ -289,60 +219,18 @@ select option {
   justify-content: space-around;
   align-items: flex-start;
   padding: 8px 2px 0;
-  background: rgba(5, 5, 16, 0.92);
+  background: rgba(5, 5, 7, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
 }
 
-.iphone-tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 0;
-  min-width: 0;
-  color: rgba(148, 163, 184, 0.5);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 10px;
-  letter-spacing: 0.2px;
-  transition: color 0.2s;
-  text-decoration: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.iphone-tab:hover {
-  color: rgba(148, 163, 184, 0.8);
-}
-
-.iphone-tab.active {
-  color: #8b5cf6;
-}
-
-.iphone-tab svg {
-  width: 22px;
-  height: 22px;
-  transition: transform 0.25s ease;
-}
-
-.iphone-tab-active svg {
-  animation: tab-icon-pop 0.3s ease forwards;
-}
-
-@keyframes tab-icon-pop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.18); }
-  100% { transform: scale(1.08); }
-}
-
 .iphone-home-area {
   display: flex;
   justify-content: center;
   padding: 6px 0 8px;
-  background: rgba(5, 5, 16, 0.92);
+  background: rgba(5, 5, 7, 0.92);
   flex-shrink: 0;
 }
 
@@ -353,53 +241,15 @@ select option {
   border-radius: 3px;
 }
 
-/* ============ Scroll-triggered fade-in ============ */
-.animate-on-scroll {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.animate-on-scroll.visible {
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 0.6s ease, transform 0.6s ease;
-}
-
-/* ============ Tab bar active animation ============ */
-.iphone-tab-active svg {
-  transform: scale(1.15);
-  transition: transform 0.2s ease;
-}
-
-/* ============ Card hover lift ============ */
-.card-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.2), 0 0 40px rgba(139, 92, 246, 0.08);
-}
-
-/* ============ Glass card ============ */
-.glass-card {
-  background: rgba(15, 15, 42, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 1rem;
-}
-
-/* ============ iPhone frame animated gradient border ============ */
-@keyframes frame-glow {
-  0% { --glow-angle: 0deg; }
-  100% { --glow-angle: 360deg; }
-}
-
 @property --glow-angle {
   syntax: "<angle>";
   initial-value: 0deg;
   inherits: false;
+}
+
+@keyframes frame-glow {
+  0% { --glow-angle: 0deg; }
+  100% { --glow-angle: 360deg; }
 }
 
 .iphone-device::before {
@@ -409,64 +259,11 @@ select option {
   border-radius: 57px;
   background: conic-gradient(
     from var(--glow-angle),
-    #8b5cf6,
-    #3b82f6,
-    #06b6d4,
-    #3b82f6,
-    #8b5cf6
+    #4a90e2,
+    #9b51e0,
+    #4a90e2
   );
   opacity: 0.15;
   z-index: -1;
   animation: frame-glow 8s linear infinite;
-}
-
-/* Force mobile layout inside iPhone frame on wider viewports */
-@media (min-width: 640px) {
-  .iphone-content .sm\:flex-row {
-    flex-direction: row !important;
-  }
-}
-
-@media (min-width: 768px) {
-  .iphone-content .md\:grid-cols-2 {
-    grid-template-columns: 1fr !important;
-  }
-  .iphone-content .md\:grid-cols-3 {
-    grid-template-columns: 1fr !important;
-  }
-  .iphone-content .md\:grid-cols-5 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-  .iphone-content .md\:flex-row {
-    flex-direction: column !important;
-  }
-  .iphone-content .md\:text-8xl {
-    font-size: 3.75rem !important;
-    line-height: 1 !important;
-  }
-  .iphone-content .md\:text-6xl {
-    font-size: 3rem !important;
-    line-height: 1 !important;
-  }
-  .iphone-content .md\:text-4xl {
-    font-size: 1.875rem !important;
-    line-height: 2.25rem !important;
-  }
-  .iphone-content .md\:text-2xl {
-    font-size: 1.25rem !important;
-    line-height: 1.75rem !important;
-  }
-  .iphone-content .md\:text-xl {
-    font-size: 1.125rem !important;
-    line-height: 1.75rem !important;
-  }
-  .iphone-content .md\:p-12 {
-    padding: 2rem !important;
-  }
-}
-
-@media (min-width: 1024px) {
-  .iphone-content .lg\:grid-cols-2 {
-    grid-template-columns: 1fr !important;
-  }
 }
