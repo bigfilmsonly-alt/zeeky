@@ -1,26 +1,472 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050510;
+  --foreground: #ededed;
+  --accent-purple: #8b5cf6;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --surface: #0f0f2a;
+  --surface-light: #1a1a3e;
+  --text-muted: #94a3b8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-cyan: var(--accent-cyan);
+  --color-surface: var(--surface);
+  --color-surface-light: var(--surface-light);
+  --color-text-muted: var(--text-muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background: #000;
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effect */
+.glow-purple {
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.3), 0 0 80px rgba(139, 92, 246, 0.1);
+}
+
+.glow-blue {
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.3), 0 0 80px rgba(59, 130, 246, 0.1);
+}
+
+/* Animated gradient background */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Fade in animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out forwards;
+}
+
+/* Pulse glow */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Cube breathing animation for Company section */
+@keyframes cube-breathe {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.7; }
+}
+
+/* Section divider gradient line */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #8b5cf6, #3b82f6, transparent);
+}
+
+/* Hide scrollbars globally (iPhone frame manages scroll) */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
+
+/* Radar chart styles */
+.radar-ring {
+  fill: none;
+  stroke: rgba(139, 92, 246, 0.15);
+  stroke-width: 1;
+}
+
+.radar-axis {
+  stroke: rgba(139, 92, 246, 0.1);
+  stroke-width: 1;
+}
+
+.radar-area {
+  fill: rgba(139, 92, 246, 0.2);
+  stroke: #8b5cf6;
+  stroke-width: 2;
+}
+
+/* Range slider styling */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  cursor: pointer;
+  border: 2px solid #050510;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  cursor: pointer;
+  border: 2px solid #050510;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+}
+
+/* Select dropdown styling */
+select option {
+  background: #0f0f2a;
+  color: #ededed;
+}
+
+/* ============ iPhone 17 Pro Max Frame ============ */
+
+.iphone-page {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 50%, #0a0a1f 0%, #000 70%);
+}
+
+.iphone-ambient-1 {
+  position: absolute;
+  top: 15%;
+  left: 25%;
+  width: 500px;
+  height: 500px;
+  background: rgba(139, 92, 246, 0.06);
+  border-radius: 50%;
+  filter: blur(150px);
+  pointer-events: none;
+}
+
+.iphone-ambient-2 {
+  position: absolute;
+  bottom: 15%;
+  right: 25%;
+  width: 400px;
+  height: 400px;
+  background: rgba(59, 130, 246, 0.04);
+  border-radius: 50%;
+  filter: blur(150px);
+  pointer-events: none;
+}
+
+.iphone-device {
+  position: relative;
+  height: min(90dvh, 932px);
+  aspect-ratio: 430 / 932;
+  max-width: min(430px, 92vw);
+  background: linear-gradient(145deg, #2a2a2e, #1c1c1e, #2a2a2e);
+  border-radius: 55px;
+  padding: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 0 3px #111,
+    0 30px 80px rgba(0, 0, 0, 0.6),
+    0 10px 30px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+
+.iphone-screen {
+  width: 100%;
+  height: 100%;
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  border-radius: 47px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.iphone-island {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 126px;
+  height: 36px;
+  background: #000;
+  border-radius: 20px;
+  z-index: 60;
+}
+
+.iphone-island::after {
+  content: "";
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, #1a1a3e 30%, #0d0d1a 70%);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.iphone-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-top: 46px;
+}
+
+/* Fade-in for page content on navigation */
+.iphone-content > * {
+  animation: page-enter 0.2s ease-out;
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.iphone-content::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mini music player above tab bar */
+.iphone-miniplayer {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(15, 15, 42, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  position: relative;
+  gap: 8px;
+}
+
+.iphone-tabbar {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  padding: 8px 2px 0;
+  background: rgba(5, 5, 16, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.iphone-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0;
+  min-width: 0;
+  color: rgba(148, 163, 184, 0.5);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  transition: color 0.2s;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.iphone-tab:hover {
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.iphone-tab.active {
+  color: #8b5cf6;
+}
+
+.iphone-tab svg {
+  width: 22px;
+  height: 22px;
+  transition: transform 0.25s ease;
+}
+
+.iphone-tab-active svg {
+  animation: tab-icon-pop 0.3s ease forwards;
+}
+
+@keyframes tab-icon-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+  100% { transform: scale(1.08); }
+}
+
+.iphone-home-area {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 8px;
+  background: rgba(5, 5, 16, 0.92);
+  flex-shrink: 0;
+}
+
+.iphone-home-bar {
+  width: 134px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+/* ============ Scroll-triggered fade-in ============ */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.animate-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+/* ============ Tab bar active animation ============ */
+.iphone-tab-active svg {
+  transform: scale(1.15);
+  transition: transform 0.2s ease;
+}
+
+/* ============ Card hover lift ============ */
+.card-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.2), 0 0 40px rgba(139, 92, 246, 0.08);
+}
+
+/* ============ Glass card ============ */
+.glass-card {
+  background: rgba(15, 15, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1rem;
+}
+
+/* ============ iPhone frame animated gradient border ============ */
+@keyframes frame-glow {
+  0% { --glow-angle: 0deg; }
+  100% { --glow-angle: 360deg; }
+}
+
+@property --glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.iphone-device::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 57px;
+  background: conic-gradient(
+    from var(--glow-angle),
+    #8b5cf6,
+    #3b82f6,
+    #06b6d4,
+    #3b82f6,
+    #8b5cf6
+  );
+  opacity: 0.15;
+  z-index: -1;
+  animation: frame-glow 8s linear infinite;
+}
+
+/* Force mobile layout inside iPhone frame on wider viewports */
+@media (min-width: 640px) {
+  .iphone-content .sm\:flex-row {
+    flex-direction: row !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .iphone-content .md\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+  .iphone-content .md\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .iphone-content .md\:grid-cols-5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .iphone-content .md\:flex-row {
+    flex-direction: column !important;
+  }
+  .iphone-content .md\:text-8xl {
+    font-size: 3.75rem !important;
+    line-height: 1 !important;
+  }
+  .iphone-content .md\:text-6xl {
+    font-size: 3rem !important;
+    line-height: 1 !important;
+  }
+  .iphone-content .md\:text-4xl {
+    font-size: 1.875rem !important;
+    line-height: 2.25rem !important;
+  }
+  .iphone-content .md\:text-2xl {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+  .iphone-content .md\:text-xl {
+    font-size: 1.125rem !important;
+    line-height: 1.75rem !important;
+  }
+  .iphone-content .md\:p-12 {
+    padding: 2rem !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .iphone-content .lg\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
 }
