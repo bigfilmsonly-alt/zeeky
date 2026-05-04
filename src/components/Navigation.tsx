@@ -93,7 +93,13 @@ export default function Navigation() {
         </a>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-6">
+          <a
+            href="/search"
+            className="px-4 py-1.5 text-sm font-semibold bg-gradient-to-r from-accent-purple to-accent-blue rounded-full text-white hover:opacity-90 transition-opacity tracking-wide"
+          >
+            DNA Search
+          </a>
           {navLinks.map((link) => {
             const sectionId = link.href.replace("#", "");
             const isActive = activeSection === sectionId;
@@ -139,6 +145,13 @@ export default function Navigation() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden bg-[#050510]/95 backdrop-blur-xl border-t border-white/5 px-6 pb-6">
+          <a
+            href="/search"
+            onClick={() => setMobileOpen(false)}
+            className="block py-3 text-sm font-bold gradient-text tracking-wide uppercase"
+          >
+            DNA Song Search
+          </a>
           {navLinks.map((link) => {
             const sectionId = link.href.replace("#", "");
             const isActive = activeSection === sectionId;
