@@ -8,6 +8,7 @@ interface SearchResult {
   id: number;
   artist: string;
   title: string;
+  album?: string;
   year: number;
   genre: string;
   peak: number;
@@ -23,12 +24,32 @@ interface SimilarSong {
   id: number;
   artist: string;
   title: string;
+  album?: string;
   year: number;
   genre: string;
   peak: number;
   similarity: number;
   dhsScore: number;
   appleId?: number;
+}
+
+interface ArtistResult {
+  name: string;
+  songCount: number;
+  topSong: SearchResult;
+}
+
+interface AlbumResult {
+  name: string;
+  artist: string;
+  songCount: number;
+  songs: SearchResult[];
+}
+
+interface GroupedResults {
+  artists: ArtistResult[];
+  albums: AlbumResult[];
+  songs: SearchResult[];
 }
 
 interface SimilarsResponse {
@@ -92,6 +113,7 @@ function PlayButton({
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [groupedResults, setGroupedResults] = useState<GroupedResults | null>(null);
   const [selected, setSelected] = useState<SimilarsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -223,16 +245,20 @@ export default function SearchPage() {
   const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
       setResults([]);
+      setGroupedResults(null);
       return;
     }
     setSearchLoading(true);
     try {
       const res = await fetch(
-        `/api/dna/search?q=${encodeURIComponent(q)}&limit=30`
+        `/api/dna/search?q=${encodeURIComponent(q)}&limit=30&mode=full`
       );
-      setResults(await res.json());
+      const data: GroupedResults = await res.json();
+      setGroupedResults(data);
+      setResults(data.songs);
     } catch {
       setResults([]);
+      setGroupedResults(null);
     }
     setSearchLoading(false);
   }, []);
@@ -480,6 +506,67 @@ export default function SearchPage() {
           )}
         </AnimatePresence>
 
+        {/* Grouped Results: Artists + Albums */}
+        <AnimatePresence>
+          {!selected && !artistPlaylist && !activeGenre && groupedResults && (groupedResults.artists.length > 0 || groupedResults.albums.length > 0) && (
+            <motion.div
+              key="grouped"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="max-w-2xl mx-auto mb-8"
+            >
+              {/* Artists */}
+              {groupedResults.artists.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xs text-text-muted uppercase tracking-wider mb-3">Artists</h2>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {groupedResults.artists.map((artist) => (
+                      <button
+                        key={artist.name}
+                        onClick={() => loadArtistPlaylist(artist.name)}
+                        className="min-w-[160px] bg-surface border border-white/5 rounded-xl p-3 text-left shrink-0 hover:border-accent-purple/30 transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-purple/30 to-accent-blue/30 flex items-center justify-center mb-2 text-sm font-bold text-white">
+                          {artist.name.charAt(0)}
+                        </div>
+                        <div className="text-sm font-medium truncate">{artist.name}</div>
+                        <div className="text-[10px] text-text-muted">{artist.songCount} songs in database</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Albums */}
+              {groupedResults.albums.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xs text-text-muted uppercase tracking-wider mb-3">Albums</h2>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {groupedResults.albums.map((album) => (
+                      <button
+                        key={`${album.name}-${album.artist}`}
+                        onClick={() => selectSong(album.songs[0])}
+                        className="min-w-[160px] bg-surface border border-white/5 rounded-xl p-3 text-left shrink-0 hover:border-accent-blue/30 transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent-blue/20 to-accent-cyan/20 flex items-center justify-center mb-2">
+                          <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-accent-blue">
+                            <rect x="4" y="2" width="16" height="20" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                            <path d="M8 6h8M8 10h8M8 14h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                        <div className="text-sm font-medium truncate">{album.name}</div>
+                        <div className="text-[10px] text-text-muted truncate">{album.artist}</div>
+                        <div className="text-[10px] text-text-muted/60">{album.songCount} tracks</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Artist Playlist Banner */}
         <AnimatePresence>
           {!selected && !artistPlaylist && !activeGenre && results.length >= 3 && (() => {
@@ -534,8 +621,8 @@ export default function SearchPage() {
               exit={{ opacity: 0 }}
               className="max-w-2xl mx-auto mb-12"
             >
-              <h2 className="text-sm text-text-muted mb-3 uppercase tracking-wider">
-                Or select a single song for its 50 DNA matches
+              <h2 className="text-xs text-text-muted mb-3 uppercase tracking-wider">
+                Songs — select any for 50 DNA matches
               </h2>
               <div className="space-y-2">
                 {results.map((song, i) => (

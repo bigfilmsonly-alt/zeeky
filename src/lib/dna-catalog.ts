@@ -5,6 +5,7 @@ export interface Song {
   id: number;
   artist: string;
   title: string;
+  album: string;
   year: number;
   genre: string;
   peak: number;
@@ -21,6 +22,7 @@ export interface SongResult {
   id: number;
   artist: string;
   title: string;
+  album: string;
   year: number;
   genre: string;
   peak: number;
@@ -66,6 +68,7 @@ function songToResult(song: Song): SongResult {
     id: song.id,
     artist: song.artist,
     title: song.title,
+    album: song.album,
     year: song.year,
     genre: song.genre,
     peak: song.peak,
@@ -78,32 +81,87 @@ function songToResult(song: Song): SongResult {
   };
 }
 
-export function searchSongs(query: string, limit = 20): SongResult[] {
+export interface SearchResults {
+  artists: { name: string; songCount: number; topSong: SongResult }[];
+  albums: { name: string; artist: string; songCount: number; songs: SongResult[] }[];
+  songs: SongResult[];
+}
+
+export function searchAll(query: string, limit = 30): SearchResults {
   const songs = loadCatalog();
   const q = query.toLowerCase().trim();
-  if (!q) return [];
+  if (!q) return { artists: [], albums: [], songs: [] };
 
-  const results: { song: Song; score: number }[] = [];
+  const matchedSongs: { song: Song; score: number }[] = [];
 
   for (const song of songs) {
     const artist = song.artist.toLowerCase();
     const title = song.title.toLowerCase();
-    const combined = `${artist} ${title}`;
+    const album = (song.album || "").toLowerCase();
+    const genre = song.genre.toLowerCase();
 
     let score = 0;
     if (title === q) score = 100;
-    else if (artist === q) score = 90;
-    else if (title.startsWith(q)) score = 80;
-    else if (artist.startsWith(q)) score = 70;
-    else if (combined.includes(q)) score = 50;
+    else if (artist === q) score = 95;
+    else if (album === q) score = 90;
+    else if (title.startsWith(q)) score = 85;
+    else if (artist.startsWith(q)) score = 80;
+    else if (album.startsWith(q)) score = 75;
+    else if (title.includes(q)) score = 60;
+    else if (artist.includes(q)) score = 55;
+    else if (album.includes(q)) score = 50;
+    else if (genre.includes(q)) score = 40;
     else continue;
 
     score += Math.min(song.rank, 10) * 0.1;
-    results.push({ song, score });
+    matchedSongs.push({ song, score });
   }
 
-  results.sort((a, b) => b.score - a.score);
-  return results.slice(0, limit).map(({ song }) => songToResult(song));
+  matchedSongs.sort((a, b) => b.score - a.score);
+
+  // Group by artist
+  const artistMap = new Map<string, Song[]>();
+  for (const { song } of matchedSongs) {
+    const key = song.artist;
+    if (!artistMap.has(key)) artistMap.set(key, []);
+    artistMap.get(key)!.push(song);
+  }
+  const artists = [...artistMap.entries()]
+    .map(([name, songs]) => ({
+      name,
+      songCount: songs.length,
+      topSong: songToResult(songs.sort((a, b) => b.rank - a.rank)[0]),
+    }))
+    .sort((a, b) => b.songCount - a.songCount || b.topSong.rank - a.topSong.rank)
+    .slice(0, 10);
+
+  // Group by album
+  const albumMap = new Map<string, { artist: string; songs: Song[] }>();
+  for (const { song } of matchedSongs) {
+    if (!song.album) continue;
+    const key = `${song.album}|||${song.artist}`;
+    if (!albumMap.has(key)) albumMap.set(key, { artist: song.artist, songs: [] });
+    albumMap.get(key)!.songs.push(song);
+  }
+  const albums = [...albumMap.entries()]
+    .map(([key, val]) => ({
+      name: key.split("|||")[0],
+      artist: val.artist,
+      songCount: val.songs.length,
+      songs: val.songs.sort((a, b) => b.rank - a.rank).slice(0, 5).map(songToResult),
+    }))
+    .sort((a, b) => b.songCount - a.songCount)
+    .slice(0, 10);
+
+  // Flat song list
+  const songResults = matchedSongs.slice(0, limit).map(({ song }) => songToResult(song));
+
+  return { artists, albums, songs: songResults };
+}
+
+// Keep backward compat for existing API
+export function searchSongs(query: string, limit = 20): SongResult[] {
+  return searchAll(query, limit).songs;
 }
 
 export function getSimilars(songId: number): {
@@ -120,6 +178,7 @@ export function getSimilars(songId: number): {
       id: sim.id,
       artist: s?.artist ?? "Unknown",
       title: s?.title ?? "Unknown",
+      album: s?.album ?? "",
       year: s?.year ?? 0,
       genre: s?.genre ?? "",
       peak: s?.peak ?? 0,
@@ -239,11 +298,13 @@ export function getArtistPlaylist(artistQuery: string, playlistSize = 50): {
       id: r.id,
       artist: s?.artist ?? "Unknown",
       title: s?.title ?? "Unknown",
+      album: s?.album ?? "",
       year: s?.year ?? 0,
       genre: s?.genre ?? "",
       peak: s?.peak ?? 0,
       similarity: Math.round((r.score / maxScore) * 10000) / 100,
       dhsScore: s?.dhsScore ?? 0,
+      energyNorm: s?.energyNorm ?? 0,
       ...(s?.appleId ? { appleId: s.appleId } : {}),
     };
   });
