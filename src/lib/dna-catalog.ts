@@ -10,6 +10,9 @@ export interface Song {
   peak: number;
   weeks: number;
   rank: number;
+  dhsScore: number;
+  energyTotal: number;
+  energyNorm: number;
   appleId?: number;
   similars: { id: number; similarity: number }[];
 }
@@ -23,6 +26,9 @@ export interface SongResult {
   peak: number;
   weeks: number;
   rank: number;
+  dhsScore: number;
+  energyTotal: number;
+  energyNorm: number;
   appleId?: number;
 }
 
@@ -34,6 +40,7 @@ export interface SimilarSong {
   genre: string;
   peak: number;
   similarity: number;
+  dhsScore: number;
   appleId?: number;
 }
 
@@ -64,6 +71,9 @@ function songToResult(song: Song): SongResult {
     peak: song.peak,
     weeks: song.weeks,
     rank: song.rank,
+    dhsScore: song.dhsScore,
+    energyTotal: song.energyTotal,
+    energyNorm: song.energyNorm,
     ...(song.appleId ? { appleId: song.appleId } : {}),
   };
 }
@@ -114,6 +124,7 @@ export function getSimilars(songId: number): {
       genre: s?.genre ?? "",
       peak: s?.peak ?? 0,
       similarity: sim.similarity,
+      dhsScore: s?.dhsScore ?? 0,
       ...(s?.appleId ? { appleId: s.appleId } : {}),
     };
   });

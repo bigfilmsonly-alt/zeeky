@@ -13,6 +13,9 @@ interface SearchResult {
   peak: number;
   weeks: number;
   rank: number;
+  dhsScore: number;
+  energyTotal: number;
+  energyNorm: number;
   appleId?: number;
 }
 
@@ -24,6 +27,7 @@ interface SimilarSong {
   genre: string;
   peak: number;
   similarity: number;
+  dhsScore: number;
   appleId?: number;
 }
 
@@ -478,13 +482,13 @@ export default function SearchPage() {
                   </svg>
                   Back
                 </button>
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-6 flex-wrap">
                   <PlayButton
                     appleId={selected.song.appleId}
                     playing={playing}
                     onPlay={setPlaying}
                   />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <h2 className="text-2xl font-bold">
                       {selected.song.title}
                     </h2>
@@ -494,6 +498,24 @@ export default function SearchPage() {
                       <span>{selected.song.genre.split(",")[0]}</span>
                       <span>Peak #{selected.song.peak}</span>
                       <span>{selected.song.weeks} weeks</span>
+                    </div>
+                  </div>
+                  {/* DHS Patent Score */}
+                  <div className="flex gap-4 shrink-0">
+                    <div className="text-center">
+                      <div className="text-xs text-text-muted/60 uppercase tracking-wider mb-1">DHS Score</div>
+                      <div className={`text-2xl font-bold font-mono ${
+                        selected.song.dhsScore >= 45 ? "text-green-400" :
+                        selected.song.dhsScore >= 30 ? "gradient-text" : "text-accent-blue"
+                      }`}>
+                        {selected.song.dhsScore.toFixed(1)}%
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-text-muted/60 uppercase tracking-wider mb-1">Energy</div>
+                      <div className="text-2xl font-bold font-mono text-accent-cyan">
+                        {selected.song.energyNorm.toFixed(0)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -524,6 +546,9 @@ export default function SearchPage() {
                         </th>
                         <th className="px-4 py-3 text-left text-text-muted font-medium hidden sm:table-cell">
                           Year
+                        </th>
+                        <th className="px-4 py-3 text-right text-text-muted font-medium hidden sm:table-cell">
+                          DHS
                         </th>
                         <th className="px-4 py-3 text-right text-text-muted font-medium">
                           DNA Match
@@ -568,6 +593,14 @@ export default function SearchPage() {
                           </td>
                           <td className="px-4 py-3 text-text-muted hidden sm:table-cell">
                             {sim.year}
+                          </td>
+                          <td className="px-4 py-3 text-right hidden sm:table-cell">
+                            <span className={`font-mono text-xs ${
+                              sim.dhsScore >= 45 ? "text-green-400" :
+                              sim.dhsScore >= 30 ? "text-accent-purple" : "text-text-muted"
+                            }`}>
+                              {sim.dhsScore.toFixed(1)}
+                            </span>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <span
