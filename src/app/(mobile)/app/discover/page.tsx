@@ -5,15 +5,15 @@ import { usePlayer, type Track } from "@/lib/player-context";
 
 const genres = ["All", "Hip Hop", "Trap", "Pop", "R&B", "Indie"];
 
-const recommendations: (Track & { match: string; genre: string })[] = [
-  { id: "1", title: "Patek Water", artist: "Future ft Young Thug", match: "89.12%", genre: "Trap", previewUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/5a/05/4b/5a054b79-2d3c-3a3e-8a37-6aa6f0e3b5a0/mzaf_17541920244498498928.plus.aac.p.m4a" },
-  { id: "2", title: "Having Our Way", artist: "Migos ft Drake", match: "88.12%", genre: "Hip Hop", previewUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/73/1c/1f/731c1f7e-5b3e-d8a6-7c1b-5e1c7a6c3a6b/mzaf_11953084064498498928.plus.aac.p.m4a" },
-  { id: "3", title: "Golden Child", artist: "Lil Durk", match: "85.86%", genre: "Hip Hop" },
-  { id: "4", title: "Said Sum", artist: "Moneybagg Yo", match: "85.80%", genre: "Trap" },
-  { id: "5", title: "What Happened To Virgil", artist: "Lil Durk ft Gunna", match: "84.90%", genre: "Hip Hop" },
-  { id: "6", title: "Wunna", artist: "Gunna ft Young Thug", match: "84.85%", genre: "Trap" },
-  { id: "7", title: "Golden", artist: "Harry Styles", match: "80.50%", genre: "Pop" },
-  { id: "8", title: "Soul State", artist: "Biliar", match: "77.15%", genre: "Indie" },
+const recommendations: (Track & { proximity: string; genre: string })[] = [
+  { id: "1", title: "Patek Water", artist: "Future ft Young Thug", proximity: "89.12%", genre: "Trap", previewUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/5a/05/4b/5a054b79-2d3c-3a3e-8a37-6aa6f0e3b5a0/mzaf_17541920244498498928.plus.aac.p.m4a" },
+  { id: "2", title: "Having Our Way", artist: "Migos ft Drake", proximity: "88.12%", genre: "Hip Hop", previewUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/73/1c/1f/731c1f7e-5b3e-d8a6-7c1b-5e1c7a6c3a6b/mzaf_11953084064498498928.plus.aac.p.m4a" },
+  { id: "3", title: "Golden Child", artist: "Lil Durk", proximity: "85.86%", genre: "Hip Hop" },
+  { id: "4", title: "Said Sum", artist: "Moneybagg Yo", proximity: "85.80%", genre: "Trap" },
+  { id: "5", title: "What Happened To Virgil", artist: "Lil Durk ft Gunna", proximity: "84.90%", genre: "Hip Hop" },
+  { id: "6", title: "Wunna", artist: "Gunna ft Young Thug", proximity: "84.85%", genre: "Trap" },
+  { id: "7", title: "Golden", artist: "Harry Styles", proximity: "80.50%", genre: "Pop" },
+  { id: "8", title: "Soul State", artist: "Biliar", proximity: "77.15%", genre: "Indie" },
 ];
 
 const playlists = [
@@ -36,7 +36,7 @@ export default function DiscoverPage() {
   );
 
   const handlePlay = (track: typeof recommendations[0]) => {
-    play({ id: track.id, title: track.title, artist: track.artist, previewUrl: track.previewUrl, match: track.match });
+    play({ id: track.id, title: track.title, artist: track.artist, previewUrl: track.previewUrl, match: track.proximity });
   };
 
   return (
@@ -103,7 +103,8 @@ export default function DiscoverPage() {
 
       {/* Recommendations list */}
       <div>
-        <h2 className="text-sm font-bold mb-2">Songs That Actually Sound Like This</h2>
+        <h2 className="text-sm font-bold mb-0.5">Recommended for You</h2>
+        <p className="text-[10px] text-text-muted/60 mb-2">Songs closest to your DNA profile, sorted by proximity</p>
         <div className="space-y-1.5">
           {filtered.map((track, i) => {
             const isCurrentTrack = currentTrack?.id === track.id;
@@ -139,10 +140,10 @@ export default function DiscoverPage() {
                   <p className="text-[10px] text-text-muted truncate">{track.artist}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className={`text-xs font-mono ${parseFloat(track.match) > 85 ? "text-green-400" : "text-accent-purple"}`}>
-                    {track.match}
+                  <div className={`text-xs font-mono ${parseFloat(track.proximity) > 85 ? "text-green-400" : "text-accent-purple"}`}>
+                    {track.proximity}
                   </div>
-                  <div className="text-[9px] text-text-muted/50">{track.genre}</div>
+                  <div className="text-[9px] text-text-muted/50">proximity</div>
                 </div>
               </button>
             );
@@ -152,8 +153,8 @@ export default function DiscoverPage() {
 
       {/* Song DNA Explorer */}
       <div className="bg-surface border border-white/5 rounded-2xl p-4">
-        <h3 className="text-sm font-bold mb-0.5">Song DNA Explorer</h3>
-        <p className="text-[10px] text-text-muted/60 mb-3">Musical fingerprint of &quot;Scarface&quot;</p>
+        <h3 className="text-sm font-bold mb-0.5">Song DNA Profile</h3>
+        <p className="text-[10px] text-text-muted/60 mb-3">84 attributes analyzed for proximity matching</p>
         <div className="space-y-2.5">
           {[
             { attr: "Tempo", value: 78 },

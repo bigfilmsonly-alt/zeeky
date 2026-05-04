@@ -33,6 +33,32 @@ const topCities = [
   { city: "Chicago", listeners: "19K" },
 ];
 
+const proximityResultsScarface = [
+  { song: "Scarface", artist: "Zeeky", proximity: 100.0, isSelf: true },
+  { song: "Pull Up Wit Ah Stick", artist: "SahBabii", proximity: 89.12, isSelf: false },
+  { song: "Patek Water", artist: "Future ft Young Thug", proximity: 87.45, isSelf: false },
+  { song: "Having Our Way", artist: "Migos ft Drake", proximity: 85.86, isSelf: false },
+  { song: "Said Sum", artist: "Moneybagg Yo", proximity: 84.2, isSelf: false },
+  { song: "Golden Child", artist: "Lil Durk", proximity: 82.91, isSelf: false },
+  { song: "What Happened To Virgil", artist: "Lil Durk ft Gunna", proximity: 81.55, isSelf: false },
+  { song: "Wunna", artist: "Gunna ft Young Thug", proximity: 80.12, isSelf: false },
+  { song: "Money Trees", artist: "Kendrick Lamar", proximity: 78.34, isSelf: false },
+  { song: "Rockstar", artist: "DaBaby ft Roddy Ricch", proximity: 76.89, isSelf: false },
+];
+
+const proximityResultsGold = [
+  { song: "Gold", artist: "Zeeky", proximity: 100.0, isSelf: true },
+  { song: "Essence", artist: "Wizkid ft Tems", proximity: 86.34, isSelf: false },
+  { song: "Come Closer", artist: "Drake ft Wizkid", proximity: 84.77, isSelf: false },
+  { song: "Peru", artist: "Fireboy DML", proximity: 82.15, isSelf: false },
+  { song: "Love Nwantiti", artist: "CKay", proximity: 80.62, isSelf: false },
+  { song: "Calm Down", artist: "Rema", proximity: 78.93, isSelf: false },
+  { song: "Last Last", artist: "Burna Boy", proximity: 77.41, isSelf: false },
+  { song: "Mood", artist: "24kGoldn ft iann dior", proximity: 75.88, isSelf: false },
+  { song: "Stay", artist: "The Kid LAROI ft Justin Bieber", proximity: 74.22, isSelf: false },
+  { song: "Levitating", artist: "Dua Lipa ft DaBaby", proximity: 72.56, isSelf: false },
+];
+
 export default function StudioPage() {
   const [activeTrack, setActiveTrack] = useState<"scarface" | "gold">("scarface");
   const score = activeTrack === "scarface" ? 89 : 81;
@@ -78,6 +104,13 @@ export default function StudioPage() {
       {/* Hit Prediction Score */}
       <div className="bg-surface border border-white/5 rounded-2xl p-4 text-center">
         <h3 className="text-[10px] text-text-muted uppercase tracking-wider mb-2">Hit Prediction Score</h3>
+        <div className="flex items-center justify-center gap-1 mb-2">
+          <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 text-text-muted/50">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M8 7v4M8 5h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span className="text-[10px] text-text-muted/50">Based on 50 similar songs</span>
+        </div>
         <div className="relative w-20 h-20 mx-auto mb-2">
           <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
             <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
@@ -96,7 +129,32 @@ export default function StudioPage() {
           </div>
         </div>
         <p className="text-xs text-green-400 font-medium">{score >= 85 ? "High Hit Potential" : "Strong Potential"}</p>
-        <p className="text-[10px] text-text-muted/50 mt-0.5">Based on 50,000+ Billboard hits</p>
+        <p className="text-[10px] text-text-muted/50 mt-0.5">Calculated from proximity to Billboard-charting songs in our 50K+ database</p>
+      </div>
+
+      {/* DNA Proximity Results */}
+      <div className="bg-surface border border-white/5 rounded-2xl p-4">
+        <h3 className="text-sm font-bold mb-0.5">DNA Proximity Results</h3>
+        <p className="text-[10px] text-text-muted/60 mb-3">Closest matches in our database sorted by proximity</p>
+        <div className="space-y-1.5">
+          {(activeTrack === "scarface" ? proximityResultsScarface : proximityResultsGold).map((item, i) => (
+            <div key={i} className="flex items-center gap-2 py-1 border-b border-white/5 last:border-0">
+              <span className="w-4 text-[10px] text-text-muted/50 font-mono">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs truncate block">{item.song} - {item.artist}</span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className={`text-xs font-mono ${item.isSelf ? "text-green-400" : "text-accent-purple"}`}>
+                  {item.proximity.toFixed(2)}%
+                </span>
+                {item.isSelf && (
+                  <span className="text-[9px] text-green-400/70 bg-green-400/10 px-1 rounded">Self</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-text-muted/40 mt-2 text-center">Showing top 10 of 50 total matches</p>
       </div>
 
       {/* Similar Artists Radar */}
