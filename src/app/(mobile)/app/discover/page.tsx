@@ -23,6 +23,11 @@ interface SearchResult {
   appleId?: number;
 }
 
+interface GenreItem {
+  genre: string;
+  count: number;
+}
+
 interface SavedPlaylist {
   id: string;
   name: string;
@@ -31,6 +36,7 @@ interface SavedPlaylist {
 }
 
 const SEED_QUERIES = ["drake", "future", "kendrick", "rihanna", "weeknd", "travis", "post malone", "dua lipa"];
+const FREE_LIMIT = 10;
 
 export default function DiscoverPage() {
   const [chain, setChain] = useState<ChainTrack[]>([]);
@@ -50,6 +56,16 @@ export default function DiscoverPage() {
   // Save Playlist state
   const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
 
+  // Genre filtering state (Feature #16)
+  const [genres, setGenres] = useState<GenreItem[]>([]);
+  const [activeGenre, setActiveGenre] = useState<string | null>(null);
+
+  // "Why this song?" state (Feature #17)
+  const [showWhy, setShowWhy] = useState(false);
+
+  // Upgrade gate state (Feature #21)
+  const [showGate, setShowGate] = useState(false);
+
   // Pull-to-refresh state
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -67,6 +83,22 @@ export default function DiscoverPage() {
   useEffect(() => {
     startChainFromSearch("Scarface");
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch genres on mount (Feature #16)
+  useEffect(() => {
+    async function fetchGenres() {
+      try {
+        const res = await fetch("/api/dna/genres");
+        if (res.ok) {
+          const data: GenreItem[] = await res.json();
+          setGenres(data.slice(0, 8));
+        }
+      } catch {
+        // Silently fail
+      }
+    }
+    fetchGenres();
   }, []);
 
   // Progress ring animation
@@ -112,6 +144,8 @@ export default function DiscoverPage() {
     setChain([]);
     setCurrentIndex(0);
     setProgress(0);
+    setShowGate(false);
+    setShowWhy(false);
     try {
       const searchRes = await fetch(`/api/dna/search?q=${encodeURIComponent(query)}&limit=1`);
       if (!searchRes.ok) return;
@@ -165,13 +199,18 @@ export default function DiscoverPage() {
     }
   }, [play]);
 
-  const fetchNextForTrack = useCallback(async (trackId: number, existingIds: Set<number>) => {
+  const fetchNextForTrack = useCallback(async (trackId: number, existingIds: Set<number>, genreFilter: string | null) => {
     setIsFetchingNext(true);
     try {
       const res = await fetch(`/api/dna/similars?id=${trackId}&limit=50`);
       if (!res.ok) return null;
       const data = await res.json();
-      const similars: { id: number; artist: string; title: string; similarity: number; genre: string; dhsScore: number; appleId?: number }[] = data.similars;
+      let similars: { id: number; artist: string; title: string; similarity: number; genre: string; dhsScore: number; appleId?: number }[] = data.similars;
+
+      // Apply genre filter if active (Feature #16)
+      if (genreFilter) {
+        similars = similars.filter((s) => s.genre.includes(genreFilter));
+      }
 
       // Pick the top neighbor not already in chain
       const next = similars.find((s) => !existingIds.has(s.id));
@@ -196,20 +235,33 @@ export default function DiscoverPage() {
   const handleSkip = useCallback(async () => {
     if (currentIndex >= chain.length - 1) return;
 
+    // Upgrade gate check (Feature #21)
+    if (chain.length >= FREE_LIMIT) {
+      setShowGate(true);
+      return;
+    }
+
     const nextIdx = currentIndex + 1;
     setCurrentIndex(nextIdx);
     setProgress(0);
+    setShowWhy(false);
 
     const nextT = chain[nextIdx];
     play({ id: String(nextT.id), title: nextT.title, artist: nextT.artist });
 
     // Fetch a new track to append (infinite chaining)
     const existingIds = new Set(chain.map((t) => t.id));
-    const newTrack = await fetchNextForTrack(nextT.id, existingIds);
+    const newTrack = await fetchNextForTrack(nextT.id, existingIds, activeGenre);
     if (newTrack) {
       setChain((prev) => [...prev, newTrack]);
     }
-  }, [currentIndex, chain, play, fetchNextForTrack]);
+  }, [currentIndex, chain, play, fetchNextForTrack, activeGenre]);
+
+  const handleResetChain = () => {
+    setShowGate(false);
+    const randomQuery = SEED_QUERIES[Math.floor(Math.random() * SEED_QUERIES.length)];
+    startChainFromSearch(randomQuery);
+  };
 
   const handlePlayPause = () => {
     setIsSpinning(!isSpinning);
@@ -352,6 +404,35 @@ export default function DiscoverPage() {
         <p className="text-text-muted text-[10px] mt-0.5">Auto-discovering your next favorite song</p>
       </div>
 
+      {/* Genre Filter Pills (Feature #16) */}
+      {genres.length > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <button
+            onClick={() => setActiveGenre(null)}
+            className={`px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap shrink-0 ${
+              activeGenre === null
+                ? "bg-accent-purple text-white"
+                : "bg-white/5 text-text-muted/70"
+            }`}
+          >
+            All
+          </button>
+          {genres.map((g) => (
+            <button
+              key={g.genre}
+              onClick={() => setActiveGenre(g.genre)}
+              className={`px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap shrink-0 ${
+                activeGenre === g.genre
+                  ? "bg-accent-purple text-white"
+                  : "bg-white/5 text-text-muted/70"
+              }`}
+            >
+              {g.genre}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Search Overlay */}
       {showSearch && (
         <div className="bg-surface border border-white/5 rounded-2xl p-3.5">
@@ -479,12 +560,20 @@ export default function DiscoverPage() {
               )}
             </div>
 
-            {/* DNA Match badge */}
+            {/* DNA Match badge + Why button (Feature #17) */}
             {currentIndex > 0 && (
-              <div className="mt-2 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10">
-                <span className="text-[10px] text-text-muted">DNA Match: </span>
-                <span className="text-[10px] font-mono text-green-400">{currentTrack.similarity}</span>
-                <span className="text-[10px] text-text-muted"> from previous</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <div className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10">
+                  <span className="text-[10px] text-text-muted">DNA Match: </span>
+                  <span className="text-[10px] font-mono text-green-400">{currentTrack.similarity}</span>
+                  <span className="text-[10px] text-text-muted"> from previous</span>
+                </div>
+                <button
+                  onClick={() => setShowWhy(!showWhy)}
+                  className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-text-muted hover:text-white transition-colors"
+                >
+                  Why?
+                </button>
               </div>
             )}
             {currentIndex === 0 && (
@@ -516,6 +605,60 @@ export default function DiscoverPage() {
                 className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 text-[11px] font-medium text-white active:scale-95 transition-transform disabled:opacity-30"
               >
                 Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* "Why this song?" explainer (Feature #17) */}
+      {showWhy && currentIndex > 0 && currentTrack && (
+        <div className="bg-white/5 rounded-xl p-3 text-[10px]">
+          <p className="text-text-muted">
+            This track was selected because its DNA profile is{" "}
+            <span className="text-white font-mono">{currentTrack.similarity}</span>{" "}
+            similar to the previous track
+          </p>
+          <ul className="mt-2 space-y-1 text-text-muted/70">
+            <li className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-purple-400" />
+              High bass presence
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-blue-400" />
+              Similar tempo range
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-green-400" />
+              Matching chord progression
+            </li>
+          </ul>
+        </div>
+      )}
+
+      {/* Upgrade Gate (Feature #21) */}
+      {showGate && (
+        <div className="relative bg-surface rounded-2xl p-4 border border-transparent" style={{ backgroundClip: "padding-box" }}>
+          <div className="absolute inset-0 rounded-2xl border border-transparent bg-gradient-to-r from-accent-purple to-accent-blue" style={{ mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)", maskComposite: "xor", WebkitMaskComposite: "xor", padding: "1px" }} />
+          <div className="relative flex flex-col items-center gap-3 text-center">
+            <h3 className="text-sm font-bold text-white">
+              You&apos;ve discovered 10 tracks!
+            </h3>
+            <p className="text-[11px] text-text-muted">
+              Unlock unlimited DJ chains with Pro
+            </p>
+            <div className="flex gap-2.5 w-full mt-1">
+              <a
+                href="/app/upgrade"
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-accent-purple to-accent-blue text-[11px] font-medium text-white text-center active:scale-[0.98] transition-transform"
+              >
+                Upgrade to Pro
+              </a>
+              <button
+                onClick={handleResetChain}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px] font-medium text-white active:scale-[0.98] transition-transform"
+              >
+                Start New Chain
               </button>
             </div>
           </div>

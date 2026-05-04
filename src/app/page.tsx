@@ -1139,25 +1139,36 @@ export default function ZeekyPage() {
 
       {/* BOTTOM TAB BAR */}
       <div className="tab-bar">
-        <button className={`tab-btn ${activeTab === "engine" ? "active" : ""}`} onClick={() => { setActiveTab("engine"); document.getElementById("engine")?.scrollIntoView({ behavior: "smooth" }); }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>
-          <span>Engine</span>
-        </button>
+        {/* TAB 1: ANALYZE — the core product action */}
         <button className={`tab-btn ${activeTab === "demo" ? "active" : ""}`} onClick={() => { setActiveTab("demo"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/></svg>
+          <svg viewBox="0 0 24 24" fill={activeTab==="demo"?"currentColor":"none"} stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" strokeLinecap="round"/></svg>
           <span>Analyze</span>
         </button>
-        <button className={`tab-btn ${activeTab === "playlists" ? "active" : ""}`} onClick={() => { setActiveTab("playlists"); setResultsTab("playlists"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          <span>Playlists</span>
-        </button>
-        <button className={`tab-btn ${activeTab === "pricing" ? "active" : ""}`} onClick={() => { setActiveTab("pricing"); document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" }); }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/></svg>
-          <span>Pricing</span>
-        </button>
+
+        {/* TAB 2: LISTEN — plays the full queue back to back */}
         <button className={`tab-btn ${activeTab === "listen" ? "active" : ""}`} onClick={() => { setActiveTab("listen"); startPlaylist(); }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>
+          <svg viewBox="0 0 24 24" fill={activeTab==="listen"?"currentColor":"none"} stroke="currentColor" strokeWidth="1.5"><polygon points="5,3 19,12 5,21" fill={activeTab==="listen"?"currentColor":"none"}/></svg>
           <span>Listen</span>
+          {queue.length > 0 && <span className="tab-badge">{queue.length}</span>}
+        </button>
+
+        {/* TAB 3: PLAYLISTS — the headline feature, 6 per seed */}
+        <button className={`tab-btn ${activeTab === "playlists" ? "active" : ""}`} onClick={() => { setActiveTab("playlists"); setResultsTab("playlists"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" rx="1.5" fill={activeTab==="playlists"?"currentColor":"none"}/><rect x="14" y="3" width="7" height="7" rx="1.5" fill={activeTab==="playlists"?"currentColor":"none"}/><rect x="3" y="14" width="7" height="7" rx="1.5" fill={activeTab==="playlists"?"currentColor":"none"}/><rect x="14" y="14" width="7" height="7" rx="1.5" fill={activeTab==="playlists"?"currentColor":"none"}/></svg>
+          <span>Playlists</span>
+          <span className="tab-badge">6</span>
+        </button>
+
+        {/* TAB 4: DNA — the tech showcase */}
+        <button className={`tab-btn ${activeTab === "dna" ? "active" : ""}`} onClick={() => { setActiveTab("dna"); setResultsTab("radar"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 3c0 4 6 5 6 9s-6 5-6 9"/><path d="M18 3c0 4-6 5-6 9s6 5 6 9"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+          <span>DNA</span>
+        </button>
+
+        {/* TAB 5: LICENSE — the conversion action for DSPs */}
+        <button className={`tab-btn ${activeTab === "license" ? "active" : ""}`} onClick={() => { setActiveTab("license"); document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" }); }}>
+          <svg viewBox="0 0 24 24" fill={activeTab==="license"?"currentColor":"none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>License</span>
         </button>
       </div>
 
@@ -1448,6 +1459,8 @@ footer{padding:32px 18px 100px;border-top:1px solid var(--line);background:#000}
 .tab-btn:hover{color:rgba(255,255,255,0.6)}
 .tab-btn.active{color:var(--blue-2)}
 .tab-btn.active svg{transform:scale(1.1)}
+.tab-badge{position:absolute;top:-2px;right:50%;transform:translateX(12px);font-family:'JetBrains Mono',monospace;font-size:7px;font-weight:700;background:var(--blue);color:#fff;padding:1px 4px;border-radius:6px;line-height:1.2;min-width:14px;text-align:center}
+.tab-btn{position:relative}
 
 /* ─── MINI PLAYER ─── */
 .mini-player{position:fixed;bottom:56px;left:0;right:0;z-index:100;background:rgba(5,5,7,0.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px;max-width:520px;margin:0 auto}

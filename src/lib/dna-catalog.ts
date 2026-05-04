@@ -148,6 +148,14 @@ export function getGenres(): { genre: string; count: number }[] {
     .sort((a, b) => b.count - a.count);
 }
 
+export function getTrending(limit = 10): SongResult[] {
+  const songs = loadCatalog();
+  return songs
+    .sort((a, b) => b.dhsScore - a.dhsScore)
+    .slice(0, limit)
+    .map(songToResult);
+}
+
 export function getByGenre(genre: string, limit = 50): SongResult[] {
   const songs = loadCatalog();
   return songs

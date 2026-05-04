@@ -94,8 +94,47 @@ export default function SearchPage() {
   const [genreSongs, setGenreSongs] = useState<SearchResult[]>([]);
   const [artistPlaylist, setArtistPlaylist] = useState<ArtistPlaylist | null>(null);
   const [playing, setPlaying] = useState<number | null>(null);
+  const [playQueue, setPlayQueue] = useState<number[]>([]);
+  const [nowPlayingTitle, setNowPlayingTitle] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // Build the current play queue from whatever list is active
+  const getCurrentQueue = useCallback((): { appleId: number; label: string }[] => {
+    if (artistPlaylist) {
+      return artistPlaylist.playlist
+        .filter((s) => s.appleId)
+        .map((s) => ({ appleId: s.appleId!, label: `${s.title} — ${s.artist}` }));
+    }
+    if (selected) {
+      return selected.similars
+        .filter((s) => s.appleId)
+        .map((s) => ({ appleId: s.appleId!, label: `${s.title} — ${s.artist}` }));
+    }
+    if (genreSongs.length > 0) {
+      return genreSongs
+        .filter((s) => s.appleId)
+        .map((s) => ({ appleId: s.appleId!, label: `${s.title} — ${s.artist}` }));
+    }
+    if (results.length > 0) {
+      return results
+        .filter((s) => s.appleId)
+        .map((s) => ({ appleId: s.appleId!, label: `${s.title} — ${s.artist}` }));
+    }
+    return [];
+  }, [artistPlaylist, selected, genreSongs, results]);
+
+  // Start playing and set up queue from current position
+  const startPlaying = useCallback((appleId: number) => {
+    const queue = getCurrentQueue();
+    const idx = queue.findIndex((q) => q.appleId === appleId);
+    if (idx >= 0) {
+      setPlayQueue(queue.slice(idx).map((q) => q.appleId));
+    } else {
+      setPlayQueue([appleId]);
+    }
+    setPlaying(appleId);
+  }, [getCurrentQueue]);
 
   // Load genres on mount
   useEffect(() => {
@@ -105,18 +144,25 @@ export default function SearchPage() {
       .catch(() => {});
   }, []);
 
-  // Handle audio playback
+  // Handle audio playback with auto-advance
   useEffect(() => {
     if (!playing) {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      setNowPlayingTitle("");
       return;
     }
     if (audioRef.current) {
       audioRef.current.pause();
     }
+
+    // Find label for now-playing display
+    const queue = getCurrentQueue();
+    const current = queue.find((q) => q.appleId === playing);
+    if (current) setNowPlayingTitle(current.label);
+
     // Use iTunes preview API
     fetch(
       `https://itunes.apple.com/lookup?id=${playing}&entity=song`
@@ -127,14 +173,51 @@ export default function SearchPage() {
           (r: Record<string, unknown>) => r.wrapperType === "track"
         );
         if (track?.previewUrl) {
+          if (track.trackName && track.artistName) {
+            setNowPlayingTitle(`${track.trackName} — ${track.artistName}`);
+          }
           const audio = new Audio(track.previewUrl);
           audio.volume = 0.7;
           audio.play().catch(() => {});
-          audio.onended = () => setPlaying(null);
+          audio.onended = () => {
+            // Auto-advance to next song in queue
+            setPlayQueue((prev) => {
+              const next = prev.slice(1);
+              if (next.length > 0) {
+                setPlaying(next[0]);
+                return next;
+              }
+              setPlaying(null);
+              return [];
+            });
+          };
           audioRef.current = audio;
+        } else {
+          // No preview — skip to next
+          setPlayQueue((prev) => {
+            const next = prev.slice(1);
+            if (next.length > 0) {
+              setPlaying(next[0]);
+              return next;
+            }
+            setPlaying(null);
+            return [];
+          });
         }
       })
-      .catch(() => setPlaying(null));
+      .catch(() => {
+        // Error — skip to next
+        setPlayQueue((prev) => {
+          const next = prev.slice(1);
+          if (next.length > 0) {
+            setPlaying(next[0]);
+            return next;
+          }
+          setPlaying(null);
+          return [];
+        });
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing]);
 
   // Cleanup audio on unmount
@@ -238,12 +321,39 @@ export default function SearchPage() {
                 />
               ))}
             </div>
-            <span className="text-sm text-text-muted">
-              Playing Apple Music preview...
-            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">
+                {nowPlayingTitle || "Playing..."}
+              </div>
+              {playQueue.length > 1 && (
+                <div className="text-xs text-text-muted/60">
+                  {playQueue.length - 1} more in queue
+                </div>
+              )}
+            </div>
             <button
-              onClick={() => setPlaying(null)}
-              className="ml-auto text-xs text-text-muted hover:text-white transition-colors"
+              onClick={() => {
+                // Skip to next
+                setPlayQueue((prev) => {
+                  const next = prev.slice(1);
+                  if (next.length > 0) {
+                    setPlaying(next[0]);
+                    return next;
+                  }
+                  setPlaying(null);
+                  return [];
+                });
+              }}
+              className="px-3 py-1 text-xs text-text-muted hover:text-white transition-colors border border-white/10 rounded-full"
+            >
+              Skip
+            </button>
+            <button
+              onClick={() => {
+                setPlaying(null);
+                setPlayQueue([]);
+              }}
+              className="px-3 py-1 text-xs text-text-muted hover:text-white transition-colors border border-white/10 rounded-full"
             >
               Stop
             </button>
@@ -368,7 +478,7 @@ export default function SearchPage() {
                     <PlayButton
                       appleId={song.appleId}
                       playing={playing}
-                      onPlay={setPlaying}
+                      onPlay={startPlaying}
                       size="sm"
                     />
                     <div className="flex-1 min-w-0">
@@ -457,7 +567,7 @@ export default function SearchPage() {
                     <PlayButton
                       appleId={song.appleId}
                       playing={playing}
-                      onPlay={setPlaying}
+                      onPlay={startPlaying}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{song.title}</div>
@@ -602,7 +712,7 @@ export default function SearchPage() {
                         >
                           <td className="px-4 py-3 text-text-muted font-mono">{i + 1}</td>
                           <td className="px-2 py-3">
-                            <PlayButton appleId={song.appleId} playing={playing} onPlay={setPlaying} size="sm" />
+                            <PlayButton appleId={song.appleId} playing={playing} onPlay={startPlaying} size="sm" />
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-medium">{song.title}</div>
@@ -664,7 +774,7 @@ export default function SearchPage() {
                   <PlayButton
                     appleId={selected.song.appleId}
                     playing={playing}
-                    onPlay={setPlaying}
+                    onPlay={startPlaying}
                   />
                   <div className="flex-1 min-w-0">
                     <h2 className="text-2xl font-bold">
@@ -756,7 +866,7 @@ export default function SearchPage() {
                             <PlayButton
                               appleId={sim.appleId}
                               playing={playing}
-                              onPlay={setPlaying}
+                              onPlay={startPlaying}
                               size="sm"
                             />
                           </td>

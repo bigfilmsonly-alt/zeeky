@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const aiPlaylists = [
   { name: "Trap DNA Mix", tracks: 24, plays: "12.4K", status: "live" },
@@ -8,12 +8,13 @@ const aiPlaylists = [
   { name: "Chill Vibes AI", tracks: 30, plays: "5.1K", status: "draft" },
 ];
 
-const trendingPredictions = [
-  { track: "Scarface", artist: "Zeeky", prediction: "Trending up", confidence: 89, up: true },
-  { track: "Patek Water", artist: "Future ft Young Thug", prediction: "Peaking", confidence: 92, up: true },
-  { track: "Golden Child", artist: "Lil Durk", prediction: "Steady", confidence: 76, up: false },
-  { track: "Said Sum", artist: "Moneybagg Yo", prediction: "Rising fast", confidence: 85, up: true },
-];
+interface TrendingItem {
+  track: string;
+  artist: string;
+  prediction: string;
+  confidence: number;
+  up: boolean;
+}
 
 const scheduledContent = [
   { title: "New Drop: Scarface Remix", date: "May 5", time: "6:00 PM", type: "Release" },
@@ -23,6 +24,37 @@ const scheduledContent = [
 
 export default function LivePage() {
   const [activeView, setActiveView] = useState<"playlists" | "trending" | "schedule">("playlists");
+  const [trendingPredictions, setTrendingPredictions] = useState<TrendingItem[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchTrending() {
+      try {
+        const res = await fetch("/api/dna/trending?limit=8");
+        const data = await res.json();
+        const items: TrendingItem[] = data.trending.map(
+          (song: { title: string; artist: string; dhsScore: number }) => ({
+            track: song.title,
+            artist: song.artist,
+            prediction:
+              song.dhsScore > 80
+                ? "High potential"
+                : song.dhsScore > 60
+                  ? "Rising"
+                  : "Steady",
+            confidence: song.dhsScore,
+            up: song.dhsScore > 60,
+          })
+        );
+        setTrendingPredictions(items);
+      } catch (err) {
+        console.error("Failed to fetch trending data", err);
+      } finally {
+        setTrendingLoading(false);
+      }
+    }
+    fetchTrending();
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -106,7 +138,12 @@ export default function LivePage() {
       {activeView === "trending" && (
         <div className="space-y-2">
           <p className="text-[10px] text-text-muted/50">AI-predicted trends from streaming velocity &amp; DNA patterns</p>
-          {trendingPredictions.map((item) => (
+          {trendingLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-5 h-5 border-2 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin" />
+              <span className="ml-2 text-xs text-text-muted/50">Loading trends...</span>
+            </div>
+          ) : trendingPredictions.map((item) => (
             <div key={item.track} className="bg-surface border border-white/5 rounded-xl p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <div>
@@ -129,6 +166,7 @@ export default function LivePage() {
               <p className="text-[9px] text-text-muted/40 mt-0.5">{item.confidence}% confidence</p>
             </div>
           ))}
+
         </div>
       )}
 
