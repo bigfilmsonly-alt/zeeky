@@ -37,6 +37,11 @@ export default function ScorePage() {
   const [barWidths, setBarWidths] = useState<number[]>(DNA_BARS.map(() => 0));
   const [showResults, setShowResults] = useState(false);
 
+  /* Real data from DNA catalog API */
+  const [realScore, setRealScore] = useState<number | null>(null);
+  const [realSimilars, setRealSimilars] = useState<{name: string; pct: number}[] | null>(null);
+  const [matchedSong, setMatchedSong] = useState<{title: string; artist: string} | null>(null);
+
   /* ---- file handler ---- */
   const handleFile = useCallback((file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -59,17 +64,62 @@ export default function ScorePage() {
     [handleFile],
   );
 
-  /* ---- transition: analyzing -> results ---- */
+  /* ---- transition: analyzing -> results (fetch real data) ---- */
   useEffect(() => {
     if (flow !== "analyzing") return;
-    const id = setTimeout(() => {
-      setFlow("results");
-      setShowResults(true);
-    }, 2000);
-    return () => clearTimeout(id);
-  }, [flow]);
+    let cancelled = false;
+
+    async function fetchDna() {
+      try {
+        /* Extract song name from filename (strip extension) */
+        const songName = fileName.replace(/\.(mp3|wav|flac)$/i, "");
+
+        /* Search the DNA catalog */
+        const searchRes = await fetch(
+          `/api/dna/search?q=${encodeURIComponent(songName)}&limit=1`
+        );
+        const searchData = await searchRes.json();
+
+        if (!cancelled && searchData?.results?.length > 0) {
+          const song = searchData.results[0];
+          setMatchedSong({ title: song.title, artist: song.artist });
+          setRealScore(Math.round(song.dhsScore));
+
+          /* Fetch similar artists */
+          const similarsRes = await fetch(
+            `/api/dna/similars?id=${encodeURIComponent(song.id)}&limit=5`
+          );
+          const similarsData = await similarsRes.json();
+
+          if (!cancelled && similarsData?.results?.length > 0) {
+            const top3 = similarsData.results.slice(0, 3).map(
+              (s: { artist: string; similarity: number }) => ({
+                name: s.artist,
+                pct: Math.round(s.similarity * 100),
+              })
+            );
+            setRealSimilars(top3);
+          }
+        }
+      } catch {
+        /* On error, fall back to hardcoded values (no-op) */
+      }
+    }
+
+    /* Start fetch but ensure at least 2s of "analyzing" animation */
+    const minDelay = new Promise((r) => setTimeout(r, 2000));
+    Promise.all([fetchDna(), minDelay]).then(() => {
+      if (!cancelled) {
+        setFlow("results");
+        setShowResults(true);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [flow, fileName]);
 
   /* ---- animate score counter ---- */
+  const targetScore = realScore ?? FINAL_SCORE;
   useEffect(() => {
     if (flow !== "results") return;
     let frame: number;
@@ -79,12 +129,12 @@ export default function ScorePage() {
     const tick = (ts: number) => {
       if (!start) start = ts;
       const progress = Math.min((ts - start) / duration, 1);
-      setDisplayScore(Math.round(progress * FINAL_SCORE));
+      setDisplayScore(Math.round(progress * targetScore));
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [flow]);
+  }, [flow, targetScore]);
 
   /* ---- animate DNA bars ---- */
   useEffect(() => {
@@ -102,6 +152,9 @@ export default function ScorePage() {
     setDisplayScore(0);
     setBarWidths(DNA_BARS.map(() => 0));
     setShowResults(false);
+    setRealScore(null);
+    setRealSimilars(null);
+    setMatchedSong(null);
   };
 
   /* ================================================================ */
@@ -255,6 +308,11 @@ export default function ScorePage() {
 
           {/* ---- Score Circle ---- */}
           <div className="bg-surface border border-white/5 rounded-2xl p-5 text-center">
+            {matchedSong && (
+              <p className="text-[10px] text-accent-purple mb-2">
+                Matched: {matchedSong.title} by {matchedSong.artist}
+              </p>
+            )}
             <h3 className="text-[10px] text-text-muted uppercase tracking-wider mb-3">
               Hit Prediction Score
             </h3>
@@ -344,7 +402,7 @@ export default function ScorePage() {
             </p>
 
             <div className="space-y-2">
-              {SIMILAR_ARTISTS.map((artist, i) => (
+              {(realSimilars ?? SIMILAR_ARTISTS).map((artist, i) => (
                 <div
                   key={artist.name}
                   className="flex items-center gap-3 py-1.5"

@@ -25,6 +25,7 @@ export default function ShareCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [showScreenshotOverlay, setShowScreenshotOverlay] = useState(false);
 
   const shareUrl =
     typeof window !== "undefined"
@@ -55,17 +56,28 @@ export default function ShareCard({
   }, [shareText, shareUrl, trackName, score]);
 
   const handleDownload = useCallback(() => {
-    // Prompt the user to screenshot the card.
-    // We avoid adding html2canvas as a dependency; instead, flash a visual
-    // hint so the user knows to take a screenshot.
-    if (cardRef.current) {
-      cardRef.current.style.outline = "2px solid rgba(139,92,246,0.6)";
-      setTimeout(() => {
-        if (cardRef.current) cardRef.current.style.outline = "none";
-      }, 1500);
-    }
-    alert("Take a screenshot of the card to save it!");
+    setShowScreenshotOverlay(true);
   }, []);
+
+  const dismissOverlay = useCallback(() => {
+    setShowScreenshotOverlay(false);
+  }, []);
+
+  // Detect platform for screenshot instructions
+  const getScreenshotHint = () => {
+    if (typeof navigator === "undefined") return null;
+    const ua = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(ua)) {
+      return "Press Side Button + Volume Up to screenshot";
+    }
+    if (/android/.test(ua)) {
+      return "Press Power + Volume Down to screenshot";
+    }
+    if (/mac/.test(ua)) {
+      return "Press Cmd + Shift + 4 to screenshot";
+    }
+    return "Use your device\u2019s screenshot shortcut to save";
+  };
 
   // Determine score color gradient based on value
   const scoreGradient =
@@ -358,6 +370,243 @@ export default function ShareCard({
           Save
         </button>
       </div>
+
+      {/* ── Screenshot Overlay ─────────────────────────────── */}
+      {showScreenshotOverlay && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/95 backdrop-blur-sm">
+          {/* Screenshot hint at top */}
+          <div className="absolute top-[env(safe-area-inset-top,16px)] left-0 right-0 flex justify-center pt-4">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/10">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="w-4 h-4 text-purple-400"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              <span className="text-[11px] text-white/70 font-medium">
+                {getScreenshotHint()}
+              </span>
+            </div>
+          </div>
+
+          {/* The card rendered large for screenshot */}
+          <div
+            className="relative w-[85vw] max-w-[360px] rounded-[20px] overflow-hidden"
+            style={{ aspectRatio: "1080 / 1920" }}
+          >
+            {/* Animated gradient border */}
+            <div
+              className="absolute inset-0 rounded-[20px] p-[1.5px]"
+              style={{
+                background:
+                  "linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4, #8b5cf6)",
+                backgroundSize: "300% 300%",
+                animation: "gradient-shift 8s ease infinite",
+              }}
+            >
+              <div className="w-full h-full rounded-[19px] bg-[#050510] overflow-hidden" />
+            </div>
+
+            {/* Card inner content */}
+            <div className="absolute inset-[1.5px] rounded-[19px] bg-[#050510] overflow-hidden flex flex-col items-center justify-between py-[10%] px-[8%]">
+              {/* Background atmospheric effects */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                <div
+                  className="absolute top-[8%] left-1/2 -translate-x-1/2 w-[70%] aspect-square rounded-full opacity-20"
+                  style={{
+                    background:
+                      "radial-gradient(circle, rgba(139,92,246,0.6) 0%, transparent 70%)",
+                  }}
+                />
+                <div
+                  className="absolute bottom-[15%] right-[5%] w-[50%] aspect-square rounded-full opacity-15"
+                  style={{
+                    background:
+                      "radial-gradient(circle, rgba(59,130,246,0.5) 0%, transparent 70%)",
+                  }}
+                />
+                <div
+                  className="absolute inset-0 opacity-[0.03]"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+                    backgroundSize: "40px 40px",
+                  }}
+                />
+                <div
+                  className="absolute inset-0 opacity-30"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, transparent 0%, rgba(5,5,16,0.5) 50%, rgba(5,5,16,0.8) 100%)",
+                  }}
+                />
+              </div>
+
+              {/* Zeeky Logo */}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="w-[15%] min-w-[36px] max-w-[52px] aspect-square mb-1">
+                  <svg viewBox="0 0 100 100" className="w-full h-full" fill="none">
+                    <defs>
+                      <linearGradient
+                        id="overlayLogoGrad"
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="100%"
+                      >
+                        <stop offset="0%" stopColor="#8b5cf6" />
+                        <stop offset="50%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#06b6d4" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M25 20h50L35 50h30L25 80"
+                      stroke="url(#overlayLogoGrad)"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <line
+                      x1="50"
+                      y1="12"
+                      x2="50"
+                      y2="88"
+                      stroke="url(#overlayLogoGrad)"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+                <span
+                  className="text-[10px] font-bold tracking-[0.25em] uppercase"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
+                >
+                  ZEEKY
+                </span>
+              </div>
+
+              {/* Score */}
+              <div className="relative z-10 flex flex-col items-center -mt-[2%]">
+                <div
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[160%] aspect-square rounded-full opacity-20 blur-[40px]"
+                  style={{
+                    background:
+                      score >= 80
+                        ? "radial-gradient(circle, rgba(52,211,153,0.5) 0%, transparent 70%)"
+                        : score >= 60
+                          ? "radial-gradient(circle, rgba(251,191,36,0.5) 0%, transparent 70%)"
+                          : "radial-gradient(circle, rgba(248,113,113,0.5) 0%, transparent 70%)",
+                  }}
+                />
+                <div
+                  className={`text-[72px] leading-none font-black tracking-tight bg-gradient-to-r ${scoreGradient} bg-clip-text`}
+                  style={{
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  {score}%
+                </div>
+                <div className="mt-1 text-[11px] font-semibold tracking-[0.2em] uppercase text-white/50">
+                  Hit Potential
+                </div>
+              </div>
+
+              {/* Track info */}
+              <div className="relative z-10 text-center -mt-[2%]">
+                <div className="text-[16px] font-bold text-white leading-snug tracking-wide">
+                  {trackName}
+                </div>
+                <div className="text-[11px] text-white/40 mt-0.5 font-medium">
+                  {artistName}
+                </div>
+              </div>
+
+              {/* Similar Artists Chips */}
+              <div className="relative z-10 flex flex-wrap justify-center gap-1.5 -mt-[1%]">
+                {topArtists.map((artist) => (
+                  <div
+                    key={artist}
+                    className="px-3 py-1 rounded-full text-[9px] font-semibold text-white/70 border border-white/10 bg-white/[0.04] backdrop-blur-sm"
+                  >
+                    {artist}
+                  </div>
+                ))}
+              </div>
+
+              {/* DNA Attribute Bars */}
+              <div className="relative z-10 w-full space-y-2 -mt-[1%]">
+                <div className="text-[8px] text-white/30 uppercase tracking-[0.2em] text-center mb-1 font-semibold">
+                  Sound DNA
+                </div>
+                {topDna.map((attr) => (
+                  <div key={attr.name} className="flex items-center gap-2">
+                    <span className="text-[9px] text-white/50 w-[72px] text-right shrink-0 font-medium">
+                      {attr.name}
+                    </span>
+                    <div className="flex-1 h-[5px] rounded-full bg-white/[0.06] overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.round(attr.value * 100)}%`,
+                          background:
+                            "linear-gradient(90deg, #8b5cf6, #3b82f6, #06b6d4)",
+                        }}
+                      />
+                    </div>
+                    <span className="text-[9px] text-white/40 w-[28px] font-mono">
+                      {Math.round(attr.value * 100)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Divider */}
+              <div className="relative z-10 w-[60%] h-px bg-gradient-to-r from-transparent via-white/10 to-transparent -mt-[1%]" />
+
+              {/* Footer */}
+              <div className="relative z-10 flex flex-col items-center gap-0.5">
+                <span className="text-[9px] text-white/25 tracking-[0.15em] font-medium">
+                  Scored on
+                </span>
+                <span
+                  className="text-[11px] font-bold tracking-[0.2em]"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
+                >
+                  zeeky.com
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Done button */}
+          <button
+            onClick={dismissOverlay}
+            className="mt-6 px-8 py-3 rounded-2xl bg-white/10 border border-white/10 text-white text-sm font-bold active:scale-[0.97] transition-transform active:bg-white/15"
+          >
+            Done
+          </button>
+        </div>
+      )}
     </div>
   );
 }

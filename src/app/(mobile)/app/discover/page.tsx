@@ -23,6 +23,15 @@ interface SearchResult {
   appleId?: number;
 }
 
+interface SavedPlaylist {
+  id: string;
+  name: string;
+  tracks: ChainTrack[];
+  createdAt: string;
+}
+
+const SEED_QUERIES = ["drake", "future", "kendrick", "rihanna", "weeknd", "travis", "post malone", "dua lipa"];
+
 export default function DiscoverPage() {
   const [chain, setChain] = useState<ChainTrack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -37,6 +46,16 @@ export default function DiscoverPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Save Playlist state
+  const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
+
+  // Pull-to-refresh state
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartY = useRef<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { play, togglePlayPause } = usePlayer();
 
@@ -210,6 +229,78 @@ export default function DiscoverPage() {
     startChainFromSearch(result.title);
   };
 
+  // Save Playlist handler
+  const handleSavePlaylist = useCallback(() => {
+    if (chain.length === 0 || saveState === "saved") return;
+
+    const seedTrack = chain[0];
+    const playlist: SavedPlaylist = {
+      id: crypto.randomUUID(),
+      name: `DJ Chain - ${seedTrack.title}`,
+      tracks: [...chain],
+      createdAt: new Date().toISOString(),
+    };
+
+    const existing: SavedPlaylist[] = JSON.parse(
+      localStorage.getItem("zeeky_playlists") || "[]"
+    );
+    existing.push(playlist);
+    localStorage.setItem("zeeky_playlists", JSON.stringify(existing));
+
+    setSaveState("saved");
+    setTimeout(() => setSaveState("idle"), 2000);
+  }, [chain, saveState]);
+
+  // Pull-to-refresh handlers
+  const handlePullRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const randomQuery = SEED_QUERIES[Math.floor(Math.random() * SEED_QUERIES.length)];
+      const res = await fetch(`/api/dna/search?q=${encodeURIComponent(randomQuery)}&limit=50`);
+      if (res.ok) {
+        const data: SearchResult[] = await res.json();
+        if (data.length > 0) {
+          const randomSeed = data[Math.floor(Math.random() * data.length)];
+          await startChainFromSearch(randomSeed.title);
+        }
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setIsRefreshing(false);
+      setPullDistance(0);
+      setIsPulling(false);
+    }
+  }, [startChainFromSearch]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isRefreshing) return;
+    const container = containerRef.current;
+    if (!container || container.scrollTop > 0) return;
+
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartY.current;
+
+    if (diff > 0) {
+      setIsPulling(true);
+      setPullDistance(Math.min(diff, 120));
+    }
+  }, [isRefreshing]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (isRefreshing) return;
+    if (pullDistance > 60) {
+      handlePullRefresh();
+    } else {
+      setPullDistance(0);
+      setIsPulling(false);
+    }
+  }, [pullDistance, isRefreshing, handlePullRefresh]);
+
   const circumference = 2 * Math.PI * 54;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
@@ -229,7 +320,32 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div
+      ref={containerRef}
+      className="space-y-4"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      {(isPulling || isRefreshing) && (
+        <div
+          className="flex items-center justify-center gap-2 transition-all duration-200 overflow-hidden"
+          style={{ height: isRefreshing ? 36 : Math.min(pullDistance * 0.5, 36) }}
+        >
+          {isRefreshing ? (
+            <>
+              <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+              <span className="text-[11px] text-purple-400 font-medium">Shuffling...</span>
+            </>
+          ) : pullDistance > 60 ? (
+            <span className="text-[11px] text-text-muted">Release to refresh</span>
+          ) : (
+            <span className="text-[11px] text-text-muted/50">Pull down to refresh</span>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold gradient-text">DJ Mode</h1>
@@ -538,9 +654,14 @@ export default function DiscoverPage() {
           New Seed
         </button>
         <button
-          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-[11px] font-medium text-white active:scale-[0.98] transition-transform"
+          onClick={handleSavePlaylist}
+          className={`flex-1 py-2.5 rounded-xl text-[11px] font-medium text-white active:scale-[0.98] transition-all ${
+            saveState === "saved"
+              ? "bg-green-600"
+              : "bg-gradient-to-r from-purple-600 to-blue-600"
+          }`}
         >
-          Save Playlist
+          {saveState === "saved" ? "\u2713 Saved!" : "Save Playlist"}
         </button>
       </div>
     </div>
