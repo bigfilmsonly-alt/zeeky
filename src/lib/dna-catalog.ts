@@ -173,8 +173,24 @@ export function getArtistPlaylist(artistQuery: string, playlistSize = 50): {
 
   if (artistSongs.length === 0) return null;
 
-  // Get canonical artist name from top-ranked song
-  const artistName = artistSongs[0].artist;
+  // Get canonical artist name — prefer the shortest (solo) name that matches
+  const nameFreq = new Map<string, number>();
+  for (const s of artistSongs) {
+    const name = s.artist;
+    nameFreq.set(name, (nameFreq.get(name) || 0) + 1);
+  }
+  let artistName = artistSongs[0].artist;
+  let bestScore = 0;
+  for (const [name, count] of nameFreq) {
+    // Prefer names that start with the query, are shorter (solo credits), and appear often
+    const startsWithQ = name.toLowerCase().startsWith(q) ? 10 : 0;
+    const noFeaturing = name.includes("Featuring") || name.includes(" & ") || name.includes(" ft ") ? 0 : 5;
+    const score = count + startsWithQ + noFeaturing;
+    if (score > bestScore) {
+      bestScore = score;
+      artistName = name;
+    }
+  }
 
   // Collect artist's own song IDs to exclude from playlist
   const artistIds = new Set(artistSongs.map((s) => s.id));
@@ -206,6 +222,9 @@ export function getArtistPlaylist(artistQuery: string, playlistSize = 50): {
     .sort((a, b) => b.score - a.score)
     .slice(0, playlistSize);
 
+  // Normalize scores to 0-100 range
+  const maxScore = ranked.length > 0 ? ranked[0].score : 1;
+
   const playlist: SimilarSong[] = ranked.map((r) => {
     const s = map.get(r.id);
     return {
@@ -215,7 +234,7 @@ export function getArtistPlaylist(artistQuery: string, playlistSize = 50): {
       year: s?.year ?? 0,
       genre: s?.genre ?? "",
       peak: s?.peak ?? 0,
-      similarity: Math.round(r.score * 100) / 100,
+      similarity: Math.round((r.score / maxScore) * 10000) / 100,
       dhsScore: s?.dhsScore ?? 0,
       ...(s?.appleId ? { appleId: s.appleId } : {}),
     };
