@@ -10,7 +10,20 @@ export interface Song {
   peak: number;
   weeks: number;
   rank: number;
+  appleId?: number;
   similars: { id: number; similarity: number }[];
+}
+
+export interface SongResult {
+  id: number;
+  artist: string;
+  title: string;
+  year: number;
+  genre: string;
+  peak: number;
+  weeks: number;
+  rank: number;
+  appleId?: number;
 }
 
 export interface SimilarSong {
@@ -21,6 +34,7 @@ export interface SimilarSong {
   genre: string;
   peak: number;
   similarity: number;
+  appleId?: number;
 }
 
 let catalog: Song[] | null = null;
@@ -40,7 +54,21 @@ function getIdMap(): Map<number, Song> {
   return idMap;
 }
 
-export function searchSongs(query: string, limit = 20): Omit<Song, "similars">[] {
+function songToResult(song: Song): SongResult {
+  return {
+    id: song.id,
+    artist: song.artist,
+    title: song.title,
+    year: song.year,
+    genre: song.genre,
+    peak: song.peak,
+    weeks: song.weeks,
+    rank: song.rank,
+    ...(song.appleId ? { appleId: song.appleId } : {}),
+  };
+}
+
+export function searchSongs(query: string, limit = 20): SongResult[] {
   const songs = loadCatalog();
   const q = query.toLowerCase().trim();
   if (!q) return [];
@@ -60,26 +88,16 @@ export function searchSongs(query: string, limit = 20): Omit<Song, "similars">[]
     else if (combined.includes(q)) score = 50;
     else continue;
 
-    // Boost by Billboard rank
     score += Math.min(song.rank, 10) * 0.1;
     results.push({ song, score });
   }
 
   results.sort((a, b) => b.score - a.score);
-  return results.slice(0, limit).map(({ song }) => ({
-    id: song.id,
-    artist: song.artist,
-    title: song.title,
-    year: song.year,
-    genre: song.genre,
-    peak: song.peak,
-    weeks: song.weeks,
-    rank: song.rank,
-  }));
+  return results.slice(0, limit).map(({ song }) => songToResult(song));
 }
 
 export function getSimilars(songId: number): {
-  song: Omit<Song, "similars">;
+  song: SongResult;
   similars: SimilarSong[];
 } | null {
   const map = getIdMap();
@@ -96,20 +114,34 @@ export function getSimilars(songId: number): {
       genre: s?.genre ?? "",
       peak: s?.peak ?? 0,
       similarity: sim.similarity,
+      ...(s?.appleId ? { appleId: s.appleId } : {}),
     };
   });
 
-  return {
-    song: {
-      id: song.id,
-      artist: song.artist,
-      title: song.title,
-      year: song.year,
-      genre: song.genre,
-      peak: song.peak,
-      weeks: song.weeks,
-      rank: song.rank,
-    },
-    similars,
-  };
+  return { song: songToResult(song), similars };
+}
+
+export function getGenres(): { genre: string; count: number }[] {
+  const songs = loadCatalog();
+  const counts: Record<string, number> = {};
+  for (const s of songs) {
+    for (const g of s.genre.split(",")) {
+      const genre = g.trim();
+      if (genre && genre !== "Music") {
+        counts[genre] = (counts[genre] || 0) + 1;
+      }
+    }
+  }
+  return Object.entries(counts)
+    .map(([genre, count]) => ({ genre, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export function getByGenre(genre: string, limit = 50): SongResult[] {
+  const songs = loadCatalog();
+  return songs
+    .filter((s) => s.genre.toLowerCase().includes(genre.toLowerCase()))
+    .sort((a, b) => b.rank - a.rank)
+    .slice(0, limit)
+    .map(songToResult);
 }
