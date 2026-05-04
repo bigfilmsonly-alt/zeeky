@@ -136,7 +136,7 @@ export default function DiscoverPage() {
   const touchStartY = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { play, togglePlayPause } = usePlayer();
+  const { play, togglePlayPause, onTrackEnd, isPlaying, currentTrack: playerCurrentTrack } = usePlayer();
 
   const currentTrack = chain[currentIndex] ?? null;
   const nextTrack = currentIndex < chain.length - 1 ? chain[currentIndex + 1] : null;
@@ -298,7 +298,7 @@ export default function DiscoverPage() {
       }
 
       setIsSpinning(true);
-      play({ id: String(seed.id), title: seed.title, artist: seed.artist });
+      play({ id: String(seed.id), title: seed.title, artist: seed.artist, appleId: seed.appleId });
     } catch {
       // Network error — do nothing
     } finally {
@@ -392,7 +392,7 @@ export default function DiscoverPage() {
     setShowWhy(false);
 
     const nextT = chain[nextIdx];
-    play({ id: String(nextT.id), title: nextT.title, artist: nextT.artist });
+    play({ id: String(nextT.id), title: nextT.title, artist: nextT.artist, appleId: nextT.appleId });
 
     // Fetch a new track to append (infinite chaining)
     const existingIds = new Set(chain.map((t) => t.id));
@@ -401,6 +401,16 @@ export default function DiscoverPage() {
       setChain((prev) => [...prev, newTrack]);
     }
   }, [currentIndex, chain, play, fetchNextForTrack, activeGenre]);
+
+  // Set up auto-advance when track ends
+  useEffect(() => {
+    onTrackEnd(() => {
+      // Auto-skip to next song when current ends
+      if (currentIndex < chain.length - 1 && chain.length < FREE_LIMIT) {
+        handleSkip();
+      }
+    });
+  }, [currentIndex, chain.length, onTrackEnd, handleSkip]);
 
   const handleResetChain = () => {
     setShowGate(false);
@@ -699,12 +709,19 @@ export default function DiscoverPage() {
               </svg>
               {/* Inner vinyl disc */}
               <div
-                className={`absolute inset-3 rounded-full bg-gradient-to-br from-gray-900 to-black border border-white/10 flex items-center justify-center ${
+                className={`absolute inset-3 rounded-full border border-white/10 flex items-center justify-center overflow-hidden ${
                   isSpinning ? "animate-spin" : ""
                 }`}
                 style={{ animationDuration: "3s" }}
               >
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500/40 to-blue-500/40 border border-white/10" />
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  {playerCurrentTrack?.artwork ? (
+                    <img src={playerCurrentTrack.artwork} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black" />
+                  )}
+                </div>
+                <div className="relative w-5 h-5 rounded-full bg-gradient-to-br from-purple-500/40 to-blue-500/40 border border-white/10" />
                 {/* Vinyl grooves */}
                 <div className="absolute inset-2 rounded-full border border-white/[0.03]" />
                 <div className="absolute inset-4 rounded-full border border-white/[0.03]" />
@@ -713,7 +730,16 @@ export default function DiscoverPage() {
             </div>
 
             {/* Track info */}
-            <h2 className="text-sm font-bold text-white">{currentTrack.title}</h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-sm font-bold text-white">{currentTrack.title}</h2>
+              {isPlaying && (
+                <div className="flex items-end gap-[2px] h-3">
+                  <span className="w-[3px] bg-purple-400 rounded-sm animate-[equalizer_0.5s_ease-in-out_infinite_alternate]" style={{ height: "40%" }} />
+                  <span className="w-[3px] bg-purple-400 rounded-sm animate-[equalizer_0.5s_ease-in-out_0.2s_infinite_alternate]" style={{ height: "70%" }} />
+                  <span className="w-[3px] bg-purple-400 rounded-sm animate-[equalizer_0.5s_ease-in-out_0.4s_infinite_alternate]" style={{ height: "50%" }} />
+                </div>
+              )}
+            </div>
             <p className="text-[11px] text-text-muted mt-0.5">{currentTrack.artist}</p>
 
             {/* Genre + Tempo + Hit Score */}
