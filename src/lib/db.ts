@@ -92,3 +92,42 @@ export async function addToPlaylist(playlistId: string, songId: string) {
   if (error) throw error;
   return data;
 }
+
+export async function updateUserPlatform(userId: string, platform: string) {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ preferred_platform: platform })
+    .eq("id", userId);
+  if (error) throw error;
+}
+
+export async function getSongPlatformId(songId: string, platform: string) {
+  const { data, error } = await supabase
+    .from("song_platform_ids")
+    .select("*")
+    .eq("song_id", songId)
+    .eq("platform", platform)
+    .single();
+  if (error && error.code !== "PGRST116") throw error;
+  return data;
+}
+
+export async function saveSongPlatformId(
+  songId: string,
+  platform: string,
+  platformTrackId: string,
+  platformUrl?: string
+) {
+  const { data, error } = await supabase
+    .from("song_platform_ids")
+    .upsert({
+      song_id: songId,
+      platform,
+      platform_track_id: platformTrackId,
+      platform_url: platformUrl,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}

@@ -225,6 +225,7 @@ export default function ZeekyPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [genreAnimated, setGenreAnimated] = useState(true);
+  const [activeTab, setActiveTab] = useState("demo");
   const [displayScore, setDisplayScore] = useState(87);
   const [artworks, setArtworks] = useState<Record<string, string>>({});
   const [nowPlaying, setNowPlaying] = useState<{ track: string; artist: string } | null>(null);
@@ -884,6 +885,30 @@ export default function ZeekyPage() {
         </div>
       )}
 
+      {/* BOTTOM TAB BAR */}
+      <div className="tab-bar">
+        <button className={`tab-btn ${activeTab === "engine" ? "active" : ""}`} onClick={() => { setActiveTab("engine"); document.getElementById("engine")?.scrollIntoView({ behavior: "smooth" }); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>
+          <span>Engine</span>
+        </button>
+        <button className={`tab-btn ${activeTab === "demo" ? "active" : ""}`} onClick={() => { setActiveTab("demo"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/></svg>
+          <span>Analyze</span>
+        </button>
+        <button className={`tab-btn ${activeTab === "playlists" ? "active" : ""}`} onClick={() => { setActiveTab("playlists"); setResultsTab("playlists"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span>Playlists</span>
+        </button>
+        <button className={`tab-btn ${activeTab === "pricing" ? "active" : ""}`} onClick={() => { setActiveTab("pricing"); document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" }); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/></svg>
+          <span>Pricing</span>
+        </button>
+        <button className={`tab-btn ${activeTab === "listen" ? "active" : ""}`} onClick={() => { setActiveTab("listen"); if (sample.neighbors.length > 0) playTrack(sample.neighbors[0].t, sample.neighbors[0].a); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>
+          <span>Listen</span>
+        </button>
+      </div>
+
       {/* TOAST */}
       <div className={`toast ${toast ? "show" : ""}`}>
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
@@ -1161,11 +1186,19 @@ a{color:inherit;text-decoration:none}
 .exit-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;text-align:center}
 
 /* ─── FOOTER ─── */
-footer{padding:32px 18px;border-top:1px solid var(--line);background:#000}
+footer{padding:32px 18px 100px;border-top:1px solid var(--line);background:#000}
 .footer-meta{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.8px;text-align:center;line-height:1.7}
 
+/* ─── BOTTOM TAB BAR ─── */
+.tab-bar{position:fixed;bottom:0;left:0;right:0;z-index:90;display:flex;justify-content:space-around;align-items:flex-start;padding:8px 4px 6px;background:rgba(5,5,7,0.92);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-top:0.5px solid rgba(255,255,255,0.08);max-width:520px;margin:0 auto}
+.tab-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 0;min-width:0;color:rgba(255,255,255,0.35);background:none;border:none;cursor:pointer;font-size:9px;font-weight:600;letter-spacing:0.3px;transition:color 0.2s;-webkit-tap-highlight-color:transparent;font-family:'JetBrains Mono',monospace}
+.tab-btn svg{width:20px;height:20px;transition:transform 0.2s}
+.tab-btn:hover{color:rgba(255,255,255,0.6)}
+.tab-btn.active{color:var(--blue-2)}
+.tab-btn.active svg{transform:scale(1.1)}
+
 /* ─── MINI PLAYER ─── */
-.mini-player{position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(5,5,7,0.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px;max-width:520px;margin:0 auto}
+.mini-player{position:fixed;bottom:56px;left:0;right:0;z-index:100;background:rgba(5,5,7,0.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px;max-width:520px;margin:0 auto}
 .mini-player-art{width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0}
 .mini-player-info{flex:1;min-width:0}
 .mini-player-track{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
