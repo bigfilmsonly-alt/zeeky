@@ -579,6 +579,7 @@ export default function ZeekyPage() {
   const getArt = (track: string, artist: string) => artworks[`${track}|${artist}`] || "";
 
   const radarKeys = Object.keys(sample.radarPcts);
+  const radarVals = Object.values(sample.radarPcts);
   const radarPoints = radarKeys.map((_, i) => {
     const angle = (i / radarKeys.length) * Math.PI * 2 - Math.PI / 2;
     const r = (Object.values(sample.radarPcts)[i] / 100) * 90;
@@ -715,6 +716,64 @@ export default function ZeekyPage() {
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                   </button>
                 </div>
+
+                {/* ─── DNA RESULTS INLINE ─── */}
+                <div className="z-inline-dna">
+
+                  {/* Radar mini */}
+                  <div className="z-inline-section">
+                    <div className="z-section-label">Sound DNA</div>
+                    <svg viewBox="0 0 300 220" style={{width:"100%",maxWidth:280,display:"block",margin:"0 auto"}}>
+                      <defs><radialGradient id="rg2" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#fa233b" stopOpacity="0.15"/><stop offset="100%" stopColor="#fa233b" stopOpacity="0.03"/></radialGradient></defs>
+                      <g stroke="rgba(0,0,0,0.06)" fill="none">{[90,67,45,22].map(r=><circle key={r} cx="150" cy="110" r={r}/>)}</g>
+                      <polygon points={radarKeys.map((_,i)=>{const a=(i/radarKeys.length)*Math.PI*2-Math.PI/2;const r=(radarVals[i]/100)*90;return `${150+r*Math.cos(a)},${110+r*Math.sin(a)}`;}).join(" ")} fill="url(#rg2)" stroke="#fa233b" strokeWidth="1.5"/>
+                      {radarKeys.map((_,i)=>{const a=(i/radarKeys.length)*Math.PI*2-Math.PI/2;const r=(radarVals[i]/100)*90;return <circle key={i} cx={150+r*Math.cos(a)} cy={110+r*Math.sin(a)} r="3" fill="#fa233b"/>})}
+                      {radarKeys.map((k,i)=>{const a=(i/radarKeys.length)*Math.PI*2-Math.PI/2;return <text key={k} x={150+105*Math.cos(a)} y={110+105*Math.sin(a)} textAnchor="middle" dominantBaseline="middle" fill="#86868b" fontSize="8" fontWeight="500">{k}</text>})}
+                    </svg>
+                    <div className="z-radar-legend">
+                      {radarKeys.map((k,i)=><div key={k} className="z-radar-item"><span className="z-radar-label">{k}</span><span className="z-radar-val">{radarVals[i]}%</span></div>)}
+                    </div>
+                  </div>
+
+                  {/* Genres inline */}
+                  <div className="z-inline-section">
+                    <div className="z-section-label">Genre Breakdown</div>
+                    {sample.genres.map(g=>(
+                      <div key={g.n} className="z-genre-row">
+                        <div className="z-genre-name">{g.n}</div>
+                        <div className="z-genre-track"><div className="z-genre-fill" style={{width:genreAnimated?`${g.p}%`:"0",background:g.c,transition:"width 0.8s cubic-bezier(0.2,0.8,0.2,1)"}}/></div>
+                        <div className="z-genre-pct">{g.p}%</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Top Neighbors inline */}
+                  <div className="z-inline-section">
+                    <div className="z-section-label">Nearest Neighbors</div>
+                    {sample.neighbors.slice(0,5).map((n,i)=>(
+                      <div key={i} className="z-neighbor-row" onClick={()=>playTrack(n.t,n.a)} style={{cursor:"pointer"}}>
+                        <div className="z-nb-rank">{i+1}</div>
+                        <div className="z-nb-art">{getArt(n.t,n.a)?<img src={getArt(n.t,n.a)} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:6}}/>:<div className="z-art-placeholder-sm"/>}</div>
+                        <div className="z-nb-info"><div className="z-nb-title">{n.t}</div><div className="z-nb-artist">{n.a}</div></div>
+                        <div className="z-nb-pct">{n.p.toFixed(1)}%</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Market quick stats */}
+                  <div className="z-inline-section">
+                    <div className="z-section-label">Market</div>
+                    <div className="z-market-mini">
+                      <div className="z-mm-stat"><div className="z-mm-val">{sample.market.hit}%</div><div className="z-mm-label">Hit Score</div></div>
+                      <div className="z-mm-stat"><div className="z-mm-val">{sample.market.demo}</div><div className="z-mm-label">Core Demo</div></div>
+                      <div className="z-mm-stat"><div className="z-mm-val">{sample.market.reach}</div><div className="z-mm-label">Reach</div></div>
+                      <div className="z-mm-stat"><div className="z-mm-val">{sample.market.cities[0]?.n}</div><div className="z-mm-label">#1 City</div></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ─── PLAYLISTS ─── */}
+                <div className="z-section-label" style={{padding:"0 20px",marginTop:8}}>Generated Playlists</div>
 
                 {/* 6 playlist cards */}
                 <div className="z-playlists-grid">
@@ -1697,6 +1756,26 @@ a{color:inherit;text-decoration:none}
 }
 .z-toast.show{transform:translateX(-50%) translateY(0)}
 .z-toast svg{width:14px;height:14px;flex-shrink:0}
+
+/* ─── INLINE DNA ON LISTEN TAB ─── */
+.z-inline-dna{padding:0 20px;display:flex;flex-direction:column;gap:20px;margin-bottom:24px}
+.z-inline-section{background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.z-radar-legend{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px}
+.z-radar-item{display:flex;justify-content:space-between;padding:4px 8px;background:rgba(0,0,0,0.02);border-radius:6px;font-size:11px}
+.z-radar-label{color:var(--text-2)}
+.z-radar-val{font-weight:600;color:var(--text)}
+.z-nb-row,.z-neighbor-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,0.06)}
+.z-neighbor-row:last-child{border-bottom:none}
+.z-nb-rank{width:18px;font-size:11px;color:var(--text-3);text-align:right;font-weight:500;flex-shrink:0}
+.z-nb-art{width:36px;height:36px;border-radius:6px;overflow:hidden;flex-shrink:0}
+.z-nb-info{flex:1;min-width:0}
+.z-nb-title{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-nb-artist{font-size:11px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-nb-pct{font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0}
+.z-market-mini{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.z-mm-stat{background:rgba(0,0,0,0.02);border-radius:10px;padding:10px;text-align:center}
+.z-mm-val{font-size:16px;font-weight:700;letter-spacing:-0.3px}
+.z-mm-label{font-size:10px;color:var(--text-3);margin-top:2px;text-transform:uppercase;letter-spacing:0.5px}
 
 *::-webkit-scrollbar{display:none}
 `;
