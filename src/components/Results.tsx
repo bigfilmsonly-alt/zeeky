@@ -201,8 +201,8 @@ export default function Results() {
 
             <p className="text-xs text-text-muted/60 mt-4">
               {activeTab === "scarface"
-                ? "70% correlation to Drake and Future combined"
-                : "Strong correlation to Harry Styles and Billie Eilish in top 10"}
+                ? "DNA score: 86.76% — strongest match to Future, Migos, Lil Durk"
+                : "DNA score: 80.96% — strongest match to A$AP Rocky, Metro Boomin, Chief Keef"}
             </p>
           </div>
         </div>
