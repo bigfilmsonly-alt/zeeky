@@ -51,10 +51,10 @@ export default function Home() {
       {/* CTA buttons */}
       <div className="relative z-10 w-full max-w-[300px] space-y-3">
         <Link
-          href="/app"
+          href="/signup"
           className="block w-full py-3.5 bg-gradient-to-r from-accent-purple to-accent-blue rounded-2xl text-white font-bold text-center text-[15px] active:scale-[0.98] transition-transform shadow-lg shadow-accent-purple/25"
         >
-          Score My Song
+          Get Started
         </Link>
 
         <Link
@@ -63,6 +63,13 @@ export default function Home() {
         >
           Explore DNA Matches
         </Link>
+
+        <p className="text-xs text-text-muted pt-1">
+          Already have an account?{" "}
+          <Link href="/login" className="text-accent-purple font-medium hover:underline">
+            Sign In
+          </Link>
+        </p>
       </div>
 
       {/* Email waitlist */}

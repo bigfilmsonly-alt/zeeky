@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ─── DATA ───
+// ─── DATA — Every song is analyzable, every neighbor is a seed ───
 const SAMPLES: Record<string, Sample> = {
   scarface: {
     track:"Scarface", artist:"Zeeky", album:"C'est la vie",
@@ -37,7 +37,114 @@ const SAMPLES: Record<string, Sample> = {
     genres:[{n:"Pop",p:34.2,c:"#ee0979"},{n:"R&B / Soul",p:28.6,c:"#9b51e0"},{n:"Indie Pop",p:18.4,c:"#4a90e2"},{n:"Alt Rock",p:11.5,c:"#7ed957"},{n:"Latin Pop",p:7.3,c:"#f5c542"}],
     market:{hit:81,conf:"\u00B15%",demo:"F 18-29",reach:"1.8M",cities:[{n:"Los Angeles",v:"24K"},{n:"New York",v:"22K"},{n:"London",v:"19K"},{n:"Toronto",v:"14K"},{n:"Miami",v:"12K"}]}
   },
+  "harlem-shake": {
+    track:"Harlem Shake", artist:"Future ft Young Thug", album:"SUPER SLIMEY",
+    art:"art-harlem", score:91, isrc:"USUM71710041",
+    radarPcts:{TEMPO:82,CHROMA:79,BASS:95,ROLLOFF:68,MELODY:58,"PERC.":88,MFCC:91},
+    neighbors:[
+      {t:"Scarface",a:"Zeeky",p:87.0,art:"art-scarface"},
+      {t:"Sup Mate",a:"Young Thug ft Future",p:89.2,art:"art-sup"},
+      {t:"mop",a:"Gunna, Young Thug",p:88.4,art:"art-mop"},
+      {t:"Patek Water",a:"Future ft Young Thug",p:88.1,art:"art-night"},
+      {t:"I'm The Plug",a:"Drake ft Future",p:87.3,art:"art-plug"},
+      {t:"poochie gown",a:"Gunna",p:86.9,art:"art-poochie"},
+      {t:"Having Our Way",a:"Migos ft Drake",p:86.5,art:"art-having"},
+      {t:"Wunna",a:"Gunna ft Young Thug",p:86.2,art:"art-waves"},
+      {t:"NC-17",a:"Travis Scott",p:85.8,art:"art-nc17"},
+      {t:"Said Sum",a:"Moneybagg Yo",p:85.4,art:"art-said"},
+    ],
+    genres:[{n:"Trap Rap",p:44.8,c:"#f5c542"},{n:"Southern Hip-Hop",p:31.2,c:"#ff6b6b"},{n:"Pop Rap",p:11.3,c:"#7ed957"},{n:"Outliers",p:8.1,c:"#9b9b9b"},{n:"Drill",p:4.6,c:"#4a90e2"}],
+    market:{hit:91,conf:"\u00B13%",demo:"M 18-29",reach:"3.8M",cities:[{n:"Atlanta",v:"48K"},{n:"Houston",v:"35K"},{n:"Miami",v:"29K"},{n:"Los Angeles",v:"27K"},{n:"Chicago",v:"22K"}]}
+  },
+  "having-our-way": {
+    track:"Having Our Way", artist:"Migos ft Drake", album:"Culture III",
+    art:"art-having", score:88, isrc:"USUM72105678",
+    radarPcts:{TEMPO:80,CHROMA:82,BASS:89,ROLLOFF:74,MELODY:70,"PERC.":85,MFCC:86},
+    neighbors:[
+      {t:"Scarface",a:"Zeeky",p:86.1,art:"art-scarface"},
+      {t:"Harlem Shake",a:"Future ft Young Thug",p:86.5,art:"art-harlem"},
+      {t:"Said Sum",a:"Moneybagg Yo",p:86.0,art:"art-said"},
+      {t:"Golden Child",a:"Lil Durk",p:85.7,art:"art-golden"},
+      {t:"What Happened To Virgil",a:"Lil Durk ft Gunna",p:85.3,art:"art-virgil"},
+      {t:"I'm The Plug",a:"Drake ft Future",p:85.1,art:"art-plug"},
+      {t:"mop",a:"Gunna, Young Thug",p:84.6,art:"art-mop"},
+      {t:"Wants and Needs",a:"Drake ft Lil Baby",p:84.2,art:"art-azure"},
+      {t:"Way 2 Sexy",a:"Drake ft Future & Young Thug",p:83.9,art:"art-neon"},
+      {t:"Knife Talk",a:"Drake ft 21 Savage",p:83.5,art:"art-midnight"},
+    ],
+    genres:[{n:"Trap Rap",p:36.8,c:"#f5c542"},{n:"Pop Rap",p:24.5,c:"#7ed957"},{n:"Southern Hip-Hop",p:22.1,c:"#ff6b6b"},{n:"Outliers",p:10.4,c:"#9b9b9b"},{n:"Drill",p:6.2,c:"#4a90e2"}],
+    market:{hit:88,conf:"\u00B14%",demo:"M 18-34",reach:"4.2M",cities:[{n:"Atlanta",v:"52K"},{n:"Los Angeles",v:"38K"},{n:"Houston",v:"34K"},{n:"New York",v:"31K"},{n:"Chicago",v:"25K"}]}
+  },
+  "golden-child": {
+    track:"Golden Child", artist:"Lil Durk", album:"The Voice",
+    art:"art-golden", score:86, isrc:"USAT22100234",
+    radarPcts:{TEMPO:74,CHROMA:80,BASS:88,ROLLOFF:66,MELODY:72,"PERC.":80,MFCC:84},
+    neighbors:[
+      {t:"Scarface",a:"Zeeky",p:85.9,art:"art-scarface"},
+      {t:"What Happened To Virgil",a:"Lil Durk ft Gunna",p:91.2,art:"art-virgil"},
+      {t:"Having Our Way",a:"Migos ft Drake",p:85.7,art:"art-having"},
+      {t:"Said Sum",a:"Moneybagg Yo",p:84.8,art:"art-said"},
+      {t:"Harlem Shake",a:"Future ft Young Thug",p:84.1,art:"art-harlem"},
+      {t:"poochie gown",a:"Gunna",p:83.6,art:"art-poochie"},
+      {t:"mop",a:"Gunna, Young Thug",p:83.2,art:"art-mop"},
+      {t:"All My Life",a:"Lil Durk ft J. Cole",p:82.8,art:"art-azure"},
+      {t:"Broadway Girls",a:"Lil Durk ft Morgan Wallen",p:82.1,art:"art-neon"},
+      {t:"Ahhh Ha",a:"Lil Durk",p:81.5,art:"art-trap"},
+    ],
+    genres:[{n:"Trap Rap",p:38.1,c:"#f5c542"},{n:"Southern Hip-Hop",p:25.6,c:"#ff6b6b"},{n:"Drill",p:16.8,c:"#4a90e2"},{n:"Pop Rap",p:12.3,c:"#7ed957"},{n:"Outliers",p:7.2,c:"#9b9b9b"}],
+    market:{hit:86,conf:"\u00B14%",demo:"M 18-29",reach:"3.1M",cities:[{n:"Chicago",v:"42K"},{n:"Atlanta",v:"35K"},{n:"Houston",v:"28K"},{n:"Los Angeles",v:"24K"},{n:"New York",v:"21K"}]}
+  },
+  "said-sum": {
+    track:"Said Sum", artist:"Moneybagg Yo", album:"Time Served",
+    art:"art-said", score:85, isrc:"USAT22000156",
+    radarPcts:{TEMPO:84,CHROMA:76,BASS:90,ROLLOFF:72,MELODY:62,"PERC.":86,MFCC:83},
+    neighbors:[
+      {t:"Scarface",a:"Zeeky",p:85.0,art:"art-scarface"},
+      {t:"Having Our Way",a:"Migos ft Drake",p:86.0,art:"art-having"},
+      {t:"Harlem Shake",a:"Future ft Young Thug",p:85.4,art:"art-harlem"},
+      {t:"Golden Child",a:"Lil Durk",p:84.8,art:"art-golden"},
+      {t:"mop",a:"Gunna, Young Thug",p:84.3,art:"art-mop"},
+      {t:"Wockesha",a:"Moneybagg Yo",p:89.1,art:"art-inferno"},
+      {t:"Time Today",a:"Moneybagg Yo",p:88.4,art:"art-midnight"},
+      {t:"Shottas (Lala)",a:"Moneybagg Yo",p:87.2,art:"art-trap"},
+      {t:"I'm The Plug",a:"Drake ft Future",p:83.7,art:"art-plug"},
+      {t:"NC-17",a:"Travis Scott",p:83.1,art:"art-nc17"},
+    ],
+    genres:[{n:"Trap Rap",p:42.5,c:"#f5c542"},{n:"Southern Hip-Hop",p:28.8,c:"#ff6b6b"},{n:"Pop Rap",p:13.6,c:"#7ed957"},{n:"Drill",p:9.4,c:"#4a90e2"},{n:"Outliers",p:5.7,c:"#9b9b9b"}],
+    market:{hit:85,conf:"\u00B15%",demo:"M 18-29",reach:"2.9M",cities:[{n:"Memphis",v:"38K"},{n:"Atlanta",v:"33K"},{n:"Houston",v:"27K"},{n:"Chicago",v:"22K"},{n:"Los Angeles",v:"19K"}]}
+  },
+  "nc-17": {
+    track:"NC-17", artist:"Travis Scott", album:"ASTROWORLD",
+    art:"art-nc17", score:84, isrc:"USSM11803095",
+    radarPcts:{TEMPO:76,CHROMA:86,BASS:88,ROLLOFF:78,MELODY:74,"PERC.":80,MFCC:90},
+    neighbors:[
+      {t:"Scarface",a:"Zeeky",p:84.1,art:"art-scarface"},
+      {t:"Harlem Shake",a:"Future ft Young Thug",p:85.8,art:"art-harlem"},
+      {t:"I'm The Plug",a:"Drake ft Future",p:85.2,art:"art-plug"},
+      {t:"SICKO MODE",a:"Travis Scott",p:91.4,art:"art-inferno"},
+      {t:"STARGAZING",a:"Travis Scott",p:90.8,art:"art-midnight"},
+      {t:"BUTTERFLY EFFECT",a:"Travis Scott",p:89.2,art:"art-violet"},
+      {t:"goosebumps",a:"Travis Scott",p:88.5,art:"art-neon"},
+      {t:"Sup Mate",a:"Young Thug ft Future",p:84.6,art:"art-sup"},
+      {t:"Having Our Way",a:"Migos ft Drake",p:83.9,art:"art-having"},
+      {t:"mop",a:"Gunna, Young Thug",p:83.4,art:"art-mop"},
+    ],
+    genres:[{n:"Trap Rap",p:35.6,c:"#f5c542"},{n:"Psychedelic Rap",p:22.8,c:"#9b51e0"},{n:"Southern Hip-Hop",p:18.4,c:"#ff6b6b"},{n:"Pop Rap",p:14.7,c:"#7ed957"},{n:"Outliers",p:8.5,c:"#9b9b9b"}],
+    market:{hit:84,conf:"\u00B14%",demo:"M 16-28",reach:"5.1M",cities:[{n:"Houston",v:"55K"},{n:"Los Angeles",v:"42K"},{n:"New York",v:"38K"},{n:"Atlanta",v:"31K"},{n:"Chicago",v:"26K"}]}
+  },
 };
+
+// Lookup helper — find a sample by track name (case-insensitive partial match)
+function findSampleByTrack(track: string): Sample | null {
+  // Direct key match
+  const key = track.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
+  if (SAMPLES[key]) return SAMPLES[key];
+  // Search by track name
+  for (const s of Object.values(SAMPLES)) {
+    if (s.track.toLowerCase() === track.toLowerCase()) return s;
+  }
+  return null;
+}
 
 interface Neighbor { t:string; a:string; p:number; art:string }
 interface Genre { n:string; p:number; c:string }
@@ -235,13 +342,28 @@ export default function ZeekyPage() {
           <div className="input-zone">
             <div className="input-label">&#x25B8; ANALYZE A SEED TRACK</div>
             <div className="input-row"><input type="text" placeholder="Paste Spotify URL, ISRC, or song name\u2026"/><button className="analyze-btn" onClick={()=>runAnalysis(sample)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Analyze</button></div>
-            <div className="samples">{(["scarface","gold"] as const).map(k=><button key={k} className={`sample-chip ${sampleKey===k?"active":""}`} onClick={()=>loadSample(k)}><div className={`sample-chip-art ${SAMPLES[k].art}`}/>{SAMPLES[k].track} &mdash; {SAMPLES[k].artist}</button>)}</div>
+            <div className="samples">{(["scarface","gold","harlem-shake","having-our-way","golden-child","said-sum","nc-17"] as const).map(k=><button key={k} className={`sample-chip ${sampleKey===k?"active":""}`} onClick={()=>loadSample(k)}><div className={`sample-chip-art ${SAMPLES[k].art}`}/>{SAMPLES[k].track.length>14?SAMPLES[k].track.slice(0,14)+"…":SAMPLES[k].track}</button>)}</div>
           </div>
           {isAnalyzing && <div className="analyzing"><div className="analyzing-bars">{Array.from({length:7},(_,i)=><div key={i} className="analyzing-bar" style={{animationDelay:`${i*0.1}s`}}/>)}</div><div className="analyzing-text">&#x25B8; EXTRACTING 84 ATTRIBUTES</div><div className="analyzing-step">{analyzeStep}</div></div>}
           {showResults && !isAnalyzing && <div className="results">
             <div className="results-header"><div className="results-art">{getArt(sample.track,sample.artist)?<img src={getArt(sample.track,sample.artist)} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:8}}/>:<div className={`art ${sample.art}`}/>}</div><div className="results-meta"><div className="results-track">{sample.track}</div><div className="results-artist">{sample.artist} · {sample.album}</div></div><div className="results-score"><div className="results-score-num">{displayScore}</div><div className="results-score-label">DNA Match</div></div></div>
             <div className="results-tabs">{["neighbors","radar","genres","market","json"].map(t=><button key={t} className={`results-tab ${resultsTab===t?"active":""}`} onClick={()=>{setResultsTab(t);if(t==="genres")setTimeout(()=>setGenreAnimated(true),50);}}>{t==="json"?"API Response":t.charAt(0).toUpperCase()+t.slice(1)}</button>)}</div>
-            {resultsTab==="neighbors"&&<div className="neighbors">{sample.neighbors.map((n,i)=><div key={i} className="neighbor" onClick={()=>playTrack(n.t,n.a)} style={{cursor:"pointer"}}><div className="neighbor-rank">{nowPlaying?.track===n.t?<span style={{color:"var(--blue-2)"}}>&#9654;</span>:String(i+1).padStart(2,"0")}</div><div className="neighbor-art">{getArt(n.t,n.a)?<img src={getArt(n.t,n.a)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className={`art ${n.art}`}/>}</div><div className="neighbor-info"><div className="neighbor-title" style={nowPlaying?.track===n.t?{color:"var(--blue-2)"}:undefined}>{n.t}</div><div className="neighbor-artist">{n.a}</div></div><div className="neighbor-bar"><div className="neighbor-bar-fill" style={{width:`${n.p}%`}}/></div><div className="neighbor-pct">{n.p.toFixed(1)}%</div><button className="neighbor-apple" onClick={(e)=>{e.stopPropagation();openApple(n.t,n.a);}}><svg viewBox="0 0 24 24" fill="currentColor">{PLAY_ICON}</svg></button></div>)}</div>}
+            {resultsTab==="neighbors"&&<div className="neighbors">{sample.neighbors.map((n,i)=>{
+              const inDb = !!findSampleByTrack(n.t);
+              return <div key={i} className="neighbor" onClick={()=>{
+                if(inDb){const s=findSampleByTrack(n.t)!;const key=Object.keys(SAMPLES).find(k=>SAMPLES[k].track===s.track)||"scarface";setSampleKey(key);runAnalysis(s);}
+                else playTrack(n.t,n.a);
+              }} style={{cursor:"pointer"}}>
+                <div className="neighbor-rank">{nowPlaying?.track===n.t?<span style={{color:"var(--blue-2)"}}>&#9654;</span>:String(i+1).padStart(2,"0")}</div>
+                <div className="neighbor-art">{getArt(n.t,n.a)?<img src={getArt(n.t,n.a)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className={`art ${n.art}`}/>}</div>
+                <div className="neighbor-info">
+                  <div className="neighbor-title" style={nowPlaying?.track===n.t?{color:"var(--blue-2)"}:undefined}>{n.t}</div>
+                  <div className="neighbor-artist">{n.a}{inDb&&<span style={{marginLeft:6,fontSize:8,color:"var(--acid)",fontFamily:"JetBrains Mono,monospace",letterSpacing:0.8}}>IN INDEX</span>}</div>
+                </div>
+                <div className="neighbor-bar"><div className="neighbor-bar-fill" style={{width:`${n.p}%`}}/></div>
+                <div className="neighbor-pct">{n.p.toFixed(1)}%</div>
+                <button className="neighbor-apple" onClick={(e)=>{e.stopPropagation();playTrack(n.t,n.a);}}><svg viewBox="0 0 24 24" fill="currentColor">{PLAY_ICON}</svg></button>
+              </div>})}</div>}
             {resultsTab==="radar"&&<div className="radar-wrap"><svg className="radar-svg" viewBox="0 0 320 240"><defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#4a90e2" stopOpacity="0.6"/><stop offset="100%" stopColor="#9b51e0" stopOpacity="0.1"/></radialGradient></defs><g stroke="rgba(255,255,255,0.08)" fill="none">{[100,75,50,25].map(r=><circle key={r} cx="160" cy="120" r={r}/>)}</g><polygon points={radarPoints.map(p=>p.join(",")).join(" ")} fill="url(#rg)" stroke="#4a90e2" strokeWidth="1.5"/>{radarPoints.map(([x,y],i)=><circle key={i} cx={x} cy={y} r="3" fill="#4a90e2"/>)}{radarKeys.map((k,i)=>{const a=(i/radarKeys.length)*Math.PI*2-Math.PI/2;return<text key={k} x={160+115*Math.cos(a)} y={120+115*Math.sin(a)} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.65)" fontFamily="JetBrains Mono,monospace" fontSize="9" fontWeight="500">{k}</text>})}</svg><div className="radar-legend">{Object.entries(sample.radarPcts).map(([k,v])=><div key={k} className="radar-attr"><span className="radar-attr-name">{k}</span><span className="radar-attr-val">{v}%</span></div>)}</div></div>}
             {resultsTab==="genres"&&<div className="genres">{sample.genres.map(g=><div key={g.n} className="genre-bar"><div className="genre-label">{g.n}</div><div className="genre-bar-track"><div className="genre-bar-fill" style={{width:genreAnimated?`${g.p}%`:"0",background:g.c,transition:"width 0.8s cubic-bezier(0.2,0.8,0.2,1)"}}/></div><div className="genre-pct">{g.p}%</div></div>)}</div>}
             {resultsTab==="market"&&<div className="market"><div className="market-grid"><div className="market-stat"><div className="market-stat-label">Hit Score</div><div className="market-stat-val">{sample.market.hit}%</div></div><div className="market-stat"><div className="market-stat-label">Confidence</div><div className="market-stat-val">{sample.market.conf}</div></div><div className="market-stat"><div className="market-stat-label">Core Demo</div><div className="market-stat-val">{sample.market.demo}</div></div><div className="market-stat"><div className="market-stat-label">Reach</div><div className="market-stat-val">{sample.market.reach}</div></div></div><div className="input-label" style={{marginTop:14}}>&#x25B8; TOP CITIES</div>{sample.market.cities.map((c,i)=><div key={c.n} className="market-city"><div className="market-city-rank">{i+1}</div><div className="market-city-name">{c.n}</div><div className="market-city-num">{c.v}</div></div>)}</div>}

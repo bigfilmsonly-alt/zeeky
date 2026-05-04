@@ -1,10 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { usePlayer } from "@/lib/player-context";
 import AppleMusicButton from "@/components/AppleMusicButton";
+import AddToPlaylistButton from "@/components/AddToPlaylistButton";
 
-/* ─── Track data ─── */
-const TOP_10 = [
+/* ─── Fallback data (used when API is unavailable) ─── */
+const FALLBACK_TOP_10 = [
   { rank: 1, title: "Scarface", artist: "Zeeky", dna: "87.0" },
   { rank: 2, title: "Harlem Shake", artist: "Future ft Young Thug", dna: "87.0" },
   { rank: 3, title: "Having Our Way", artist: "Migos ft Drake", dna: "86.1" },
@@ -17,13 +19,63 @@ const TOP_10 = [
   { rank: 10, title: "NC-17", artist: "Travis Scott", dna: "84.1" },
 ];
 
-const MADE_FOR_YOU = [
+const FALLBACK_MADE_FOR_YOU = [
   { title: "Scarface", artist: "Zeeky", dna: "87.0", gradient: "from-purple-600 to-blue-500" },
   { title: "Harlem Shake", artist: "Future ft Young Thug", dna: "87.0", gradient: "from-pink-600 to-red-500" },
   { title: "Having Our Way", artist: "Migos ft Drake", dna: "86.1", gradient: "from-emerald-600 to-teal-500" },
   { title: "Golden Child", artist: "Lil Durk", dna: "85.9", gradient: "from-orange-600 to-yellow-500" },
   { title: "Said Sum", artist: "Moneybagg Yo", dna: "85.0", gradient: "from-cyan-600 to-indigo-500" },
 ];
+
+const GRADIENTS = [
+  "from-purple-600 to-blue-500",
+  "from-pink-600 to-red-500",
+  "from-emerald-600 to-teal-500",
+  "from-orange-600 to-yellow-500",
+  "from-cyan-600 to-indigo-500",
+];
+
+/* ─── Types ─── */
+interface TrackData {
+  rank: number;
+  title: string;
+  artist: string;
+  dna: string;
+}
+
+interface MadeForYouData {
+  title: string;
+  artist: string;
+  dna: string;
+  gradient: string;
+}
+
+/* ─── Skeleton components ─── */
+function TrackSkeleton() {
+  return (
+    <div className="flex items-center gap-2.5 py-2 px-2 rounded-lg">
+      <div className="w-5 h-3 rounded bg-white/5 animate-pulse shrink-0" />
+      <div className="w-7 h-7 rounded-full bg-white/5 animate-pulse shrink-0" />
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="h-3 w-24 rounded bg-white/5 animate-pulse" />
+        <div className="h-2.5 w-16 rounded bg-white/5 animate-pulse" />
+      </div>
+      <div className="w-8 h-3 rounded bg-white/5 animate-pulse shrink-0" />
+      <div className="w-7 h-7 rounded-full bg-white/5 animate-pulse shrink-0" />
+      <div className="w-9 h-9 rounded-lg bg-white/5 animate-pulse shrink-0" />
+    </div>
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <div className="shrink-0 w-[130px]">
+      <div className="w-full aspect-square rounded-xl bg-white/5 animate-pulse mb-1.5" />
+      <div className="h-3 w-20 rounded bg-white/5 animate-pulse mb-1" />
+      <div className="h-2.5 w-14 rounded bg-white/5 animate-pulse" />
+    </div>
+  );
+}
 
 /* ─── Helpers ─── */
 function todayFormatted(): string {
@@ -34,6 +86,49 @@ function todayFormatted(): string {
 /* ─── Page ─── */
 export default function ListenNowPage() {
   const { play } = usePlayer();
+  const [topSongs, setTopSongs] = useState<TrackData[]>(FALLBACK_TOP_10);
+  const [madeForYou, setMadeForYou] = useState<MadeForYouData[]>(FALLBACK_MADE_FOR_YOU);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchTopSongs() {
+      try {
+        const res = await fetch("/api/songs/search?q=top&limit=10");
+        if (!res.ok) throw new Error("API unavailable");
+        const data = await res.json();
+
+        if (!cancelled && data.results && data.results.length > 0) {
+          const tracks: TrackData[] = data.results.map(
+            (s: { title: string; artist: string; dna_score?: number; hit_score?: number }, i: number) => ({
+              rank: i + 1,
+              title: s.title,
+              artist: s.artist,
+              dna: (s.dna_score ?? s.hit_score ?? 80 + Math.random() * 10).toFixed(1),
+            })
+          );
+          setTopSongs(tracks);
+
+          const cards: MadeForYouData[] = tracks.slice(0, 5).map((t, i) => ({
+            title: t.title,
+            artist: t.artist,
+            dna: t.dna,
+            gradient: GRADIENTS[i % GRADIENTS.length],
+          }));
+          setMadeForYou(cards);
+        }
+        // If no results, fallback data stays
+      } catch {
+        // API not available — keep fallback data
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchTopSongs();
+    return () => { cancelled = true; };
+  }, []);
 
   const handlePreview = (title: string, artist: string) => {
     play({ id: `${title}-${artist}`, title, artist });
@@ -101,26 +196,28 @@ export default function ListenNowPage() {
       <div className="mb-5">
         <h3 className="text-sm font-bold mb-2.5 tracking-tight">Made For You</h3>
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
-          {MADE_FOR_YOU.map((t) => (
-            <div key={t.title + t.artist} className="shrink-0 w-[130px]">
-              {/* Art */}
-              <div
-                className={`w-full aspect-square rounded-xl bg-gradient-to-br ${t.gradient} mb-1.5 flex items-end p-2`}
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white/30">
-                  <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" />
-                  <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.5" />
-                </svg>
-              </div>
-              <p className="text-[11px] font-semibold truncate">{t.title}</p>
-              <p className="text-[10px] text-text-muted/50 truncate">{t.artist}</p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-[9px] font-mono text-accent-purple">{t.dna}%</span>
-                <AppleMusicButton track={t.title} artist={t.artist} size="chip" />
-              </div>
-            </div>
-          ))}
+          {loading
+            ? Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)
+            : madeForYou.map((t) => (
+                <div key={t.title + t.artist} className="shrink-0 w-[130px]">
+                  {/* Art */}
+                  <div
+                    className={`w-full aspect-square rounded-xl bg-gradient-to-br ${t.gradient} mb-1.5 flex items-end p-2`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white/30">
+                      <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" />
+                      <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  </div>
+                  <p className="text-[11px] font-semibold truncate">{t.title}</p>
+                  <p className="text-[10px] text-text-muted/50 truncate">{t.artist}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[9px] font-mono text-accent-purple">{t.dna}%</span>
+                    <AppleMusicButton track={t.title} artist={t.artist} size="chip" />
+                  </div>
+                </div>
+              ))}
         </div>
       </div>
 
@@ -128,39 +225,44 @@ export default function ListenNowPage() {
       <div>
         <h3 className="text-sm font-bold mb-2.5 tracking-tight">Top 10 &mdash; Hip-Hop/Rap</h3>
         <div className="flex flex-col gap-1">
-          {TOP_10.map((t) => (
-            <div
-              key={t.rank}
-              className="flex items-center gap-2.5 py-2 px-2 rounded-lg hover:bg-surface/50 transition-colors"
-            >
-              {/* Rank */}
-              <span className="w-5 text-right text-[11px] font-mono text-text-muted/40 shrink-0">
-                {t.rank}
-              </span>
+          {loading
+            ? Array.from({ length: 10 }).map((_, i) => <TrackSkeleton key={i} />)
+            : topSongs.map((t) => (
+                <div
+                  key={t.rank}
+                  className="flex items-center gap-2.5 py-2 px-2 rounded-lg hover:bg-surface/50 transition-colors"
+                >
+                  {/* Rank */}
+                  <span className="w-5 text-right text-[11px] font-mono text-text-muted/40 shrink-0">
+                    {t.rank}
+                  </span>
 
-              {/* Play icon */}
-              <button
-                onClick={() => handlePreview(t.title, t.artist)}
-                className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center shrink-0 active:bg-white/10 transition-colors"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-white/70">
-                  <polygon points="8,5 19,12 8,19" />
-                </svg>
-              </button>
+                  {/* Play icon */}
+                  <button
+                    onClick={() => handlePreview(t.title, t.artist)}
+                    className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center shrink-0 active:bg-white/10 transition-colors"
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-white/70">
+                      <polygon points="8,5 19,12 8,19" />
+                    </svg>
+                  </button>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold truncate">{t.title}</p>
-                <p className="text-[10px] text-text-muted/50 truncate">{t.artist}</p>
-              </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-semibold truncate">{t.title}</p>
+                    <p className="text-[10px] text-text-muted/50 truncate">{t.artist}</p>
+                  </div>
 
-              {/* DNA % */}
-              <span className="text-[10px] font-mono text-accent-purple shrink-0">{t.dna}%</span>
+                  {/* DNA % */}
+                  <span className="text-[10px] font-mono text-accent-purple shrink-0">{t.dna}%</span>
 
-              {/* Apple Music button */}
-              <AppleMusicButton track={t.title} artist={t.artist} size="track" />
-            </div>
-          ))}
+                  {/* Add to Playlist */}
+                  <AddToPlaylistButton songTitle={t.title} songArtist={t.artist} size="sm" />
+
+                  {/* Apple Music button */}
+                  <AppleMusicButton track={t.title} artist={t.artist} size="track" />
+                </div>
+              ))}
         </div>
       </div>
     </div>
