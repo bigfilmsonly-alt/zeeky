@@ -229,6 +229,8 @@ export default function ZeekyPage() {
   const [displayScore, setDisplayScore] = useState(87);
   const [artworks, setArtworks] = useState<Record<string, string>>({});
   const [nowPlaying, setNowPlaying] = useState<{ track: string; artist: string } | null>(null);
+  const [queue, setQueue] = useState<{ track: string; artist: string }[]>([]);
+  const [queueIndex, setQueueIndex] = useState(-1);
   const [expandedPlaylist, setExpandedPlaylist] = useState<number | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistDef[]>(() => generatePlaylists(SAMPLES.scarface));
 
@@ -245,7 +247,7 @@ export default function ZeekyPage() {
   // Init audio
   useEffect(() => {
     audioRef.current = new Audio();
-    audioRef.current.addEventListener("ended", () => { setIsPlaying(false); setProgress(0); });
+    audioRef.current.addEventListener("ended", () => { playNextInQueue(); });
     audioRef.current.addEventListener("timeupdate", () => {
       const a = audioRef.current!;
       if (a.duration) setProgress((a.currentTime / a.duration) * 100);
@@ -320,6 +322,53 @@ export default function ZeekyPage() {
     if (audio.paused) { audio.play().catch(() => {}); setIsPlaying(true); }
     else { audio.pause(); setIsPlaying(false); }
   }, []);
+
+  // Queue: play next track when current ends
+  const playNextInQueue = useCallback(() => {
+    setQueueIndex(prev => {
+      const next = prev + 1;
+      if (next < queue.length) {
+        const t = queue[next];
+        // Fire off the next track
+        setTimeout(() => playTrack(t.track, t.artist), 300);
+        return next;
+      }
+      // Queue finished — loop back to start
+      if (queue.length > 0) {
+        const t = queue[0];
+        setTimeout(() => playTrack(t.track, t.artist), 300);
+        return 0;
+      }
+      setIsPlaying(false);
+      setProgress(0);
+      return -1;
+    });
+  }, [queue]);
+
+  // Start a full playlist: build queue from all neighbors + known tracks, then play
+  const startPlaylist = useCallback(() => {
+    // Build a big playlist from all samples' neighbors
+    const allTracks: { track: string; artist: string }[] = [];
+    const seen = new Set<string>();
+    // Start with current sample's neighbors
+    for (const n of sample.neighbors) {
+      const key = `${n.t}|${n.a}`;
+      if (!seen.has(key)) { seen.add(key); allTracks.push({ track: n.t, artist: n.a }); }
+    }
+    // Add neighbors from other samples
+    for (const s of Object.values(SAMPLES)) {
+      for (const n of s.neighbors) {
+        const key = `${n.t}|${n.a}`;
+        if (!seen.has(key)) { seen.add(key); allTracks.push({ track: n.t, artist: n.a }); }
+      }
+    }
+    setQueue(allTracks);
+    setQueueIndex(0);
+    if (allTracks.length > 0) {
+      playTrack(allTracks[0].track, allTracks[0].artist);
+      showToast(`Playing ${allTracks.length} tracks back to back`);
+    }
+  }, [sample, playTrack, showToast]);
 
   const runAnalysis = useCallback((key: string) => {
     if (isAnalyzing) return;
@@ -1051,23 +1100,32 @@ export default function ZeekyPage() {
       {/* STICKY MINI PLAYER */}
       {nowPlaying && (
         <div className="mini-player">
+          <div className="mini-player-progress">
+            <div className="mini-player-progress-fill" style={{ width: `${progress}%` }} />
+          </div>
           <div className="mini-player-art">
             {getArt(nowPlaying.track, nowPlaying.artist)
-              ? <img src={getArt(nowPlaying.track, nowPlaying.artist)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ? <img src={getArt(nowPlaying.track, nowPlaying.artist)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 6 }} />
               : <div className="art-placeholder-tiny" />
             }
           </div>
           <div className="mini-player-info">
             <div className="mini-player-track">{nowPlaying.track}</div>
-            <div className="mini-player-artist">{nowPlaying.artist}</div>
+            <div className="mini-player-artist">{nowPlaying.artist}{queue.length > 1 && <span style={{ marginLeft: 6, fontSize: 9, color: "var(--blue-2)", fontFamily: "JetBrains Mono, monospace" }}>{queueIndex + 1}/{queue.length}</span>}</div>
           </div>
-          <div className="mini-player-progress">
-            <div className="mini-player-progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <button className="mini-player-btn" onClick={toggleAudio}>
+          {/* Skip back */}
+          <button className="mini-player-btn" onClick={() => { if (queueIndex > 0) { const prev = queue[queueIndex - 1]; setQueueIndex(queueIndex - 1); playTrack(prev.track, prev.artist); } }}>
+            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14 }}><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          </button>
+          {/* Play/Pause */}
+          <button className="mini-player-btn" onClick={toggleAudio} style={{ width: 36, height: 36, background: "linear-gradient(135deg, var(--blue), var(--violet))" }}>
             <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16 }}>
               {isPlaying ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M8 5v14l11-7z" />}
             </svg>
+          </button>
+          {/* Skip forward */}
+          <button className="mini-player-btn" onClick={() => playNextInQueue()}>
+            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14 }}><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
           </button>
         </div>
       )}
@@ -1090,7 +1148,7 @@ export default function ZeekyPage() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/></svg>
           <span>Pricing</span>
         </button>
-        <button className={`tab-btn ${activeTab === "listen" ? "active" : ""}`} onClick={() => { setActiveTab("listen"); if (sample.neighbors.length > 0) playTrack(sample.neighbors[0].t, sample.neighbors[0].a); }}>
+        <button className={`tab-btn ${activeTab === "listen" ? "active" : ""}`} onClick={() => { setActiveTab("listen"); startPlaylist(); }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>
           <span>Listen</span>
         </button>
