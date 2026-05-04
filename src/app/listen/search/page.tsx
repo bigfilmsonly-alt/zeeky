@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import AppleMusicButton from "@/components/AppleMusicButton";
+import StreamingButtons from "@/components/StreamingButtons";
 import AddToPlaylistButton from "@/components/AddToPlaylistButton";
 
 /* ─── Types ─── */
@@ -247,8 +247,8 @@ export default function SearchPage() {
                 {/* Add to Playlist */}
                 <AddToPlaylistButton songTitle={r.title} songArtist={r.artist} size="sm" />
 
-                {/* Apple Music */}
-                <AppleMusicButton track={r.title} artist={r.artist} size="neighbor" />
+                {/* Streaming buttons */}
+                <StreamingButtons track={r.title} artist={r.artist} size="sm" />
               </div>
             ))}
           </div>

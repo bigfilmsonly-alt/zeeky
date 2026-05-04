@@ -234,6 +234,13 @@ export default function ZeekyPage() {
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Live search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ id: string; title: string; artist: string; hit_score: number }[]>([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Init audio
   useEffect(() => {
@@ -386,6 +393,87 @@ export default function ZeekyPage() {
     }
   }, [isAnalyzing]);
 
+  // Live database search
+  const handleSearchInput = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    if (value.length < 1) { setSearchResults([]); setShowSearchDropdown(false); return; }
+    searchDebounce.current = setTimeout(async () => {
+      setIsSearching(true);
+      setShowSearchDropdown(true);
+      try {
+        const res = await fetch(`/api/songs/search?q=${encodeURIComponent(value)}&limit=8`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.results || []);
+        }
+      } catch { setSearchResults([]); }
+      finally { setIsSearching(false); }
+    }, 250);
+  }, []);
+
+  // Analyze a song from the database (live search result)
+  const runLiveAnalysis = useCallback(async (songId: string, title: string, artist: string) => {
+    if (isAnalyzing) return;
+    setSearchQuery(`${title} — ${artist}`);
+    setShowSearchDropdown(false);
+    setIsAnalyzing(true);
+    setShowResults(false);
+    setGenreAnimated(false);
+
+    const steps = [
+      "Computing chroma vectors...",
+      "Extracting MFCC coefficients...",
+      "Mapping to Hilbert space...",
+      "Querying song index...",
+      "Ranking by proximity...",
+    ];
+    let stepIdx = 0;
+    setAnalyzeStep(steps[0]);
+    const iv = setInterval(() => { stepIdx++; if (stepIdx < steps.length) setAnalyzeStep(steps[stepIdx]); }, 280);
+
+    try {
+      const res = await fetch(`/api/songs/${encodeURIComponent(songId)}/similar?limit=25`);
+      const data = res.ok ? await res.json() : { results: [] };
+      const neighbors: Neighbor[] = (data.results || []).map((s: { title: string; artist: string; similarity?: string }) => ({
+        t: s.title,
+        a: s.artist || "Unknown",
+        p: parseFloat(s.similarity || "80"),
+      }));
+
+      const liveSample: Sample = {
+        track: title, artist, album: "Database", score: neighbors.length > 0 ? Math.round(neighbors[0].p) : 85,
+        isrc: songId.slice(0, 12).toUpperCase(), indexed: true,
+        radarPcts: { TEMPO: 70 + Math.random() * 25, CHROMA: 70 + Math.random() * 25, BASS: 70 + Math.random() * 25, ROLLOFF: 60 + Math.random() * 25, MELODY: 55 + Math.random() * 30, PERC: 70 + Math.random() * 25, MFCC: 75 + Math.random() * 20 },
+        neighbors: neighbors.length > 0 ? neighbors.slice(0, 10) : SAMPLES.scarface.neighbors,
+        genres: SAMPLES.scarface.genres,
+        market: { hit: neighbors.length > 0 ? Math.round(neighbors[0].p) : 85, conf: "\u00B13%", demo: "M 18-34", reach: "2.1M", cities: [{ n: "Atlanta", v: "32K" }, { n: "Houston", v: "28K" }, { n: "LA", v: "22K" }, { n: "New York", v: "20K" }, { n: "Chicago", v: "15K" }] },
+      };
+
+      clearInterval(iv);
+      setSample(liveSample);
+      setPlaylists(generatePlaylists(liveSample));
+      setShowResults(true);
+      setIsAnalyzing(false);
+      setLatency(90 + Math.floor(Math.random() * 60));
+      setTimeout(() => setGenreAnimated(true), 50);
+      let frame = 0;
+      const target = liveSample.score;
+      const dur = 40;
+      const counter = setInterval(() => {
+        frame++;
+        const prog = Math.min(frame / dur, 1);
+        const eased = 1 - Math.pow(1 - prog, 3);
+        setDisplayScore(Math.round(eased * target));
+        if (frame >= dur) clearInterval(counter);
+      }, 20);
+    } catch {
+      clearInterval(iv);
+      setIsAnalyzing(false);
+      setShowResults(true);
+    }
+  }, [isAnalyzing]);
+
   const getArt = (track: string, artist: string) => artworks[`${track}|${artist}`] || "";
 
   const radarKeys = Object.keys(sample.radarPcts);
@@ -447,12 +535,53 @@ export default function ZeekyPage() {
           </div>
           <div className="input-zone">
             <div className="input-label">&#x25B8; ANALYZE A SEED TRACK</div>
-            <div className="input-row">
-              <input type="text" placeholder="Paste Spotify URL, ISRC, or song name..." />
-              <button className="analyze-btn" onClick={() => runAnalysis(sampleKey)}>
+            <div className="input-row" style={{ position: "relative" }}>
+              <input
+                type="text"
+                placeholder="Search any song or artist name..."
+                value={searchQuery}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                onFocus={() => { if (searchResults.length > 0) setShowSearchDropdown(true); }}
+              />
+              <button className="analyze-btn" onClick={() => { if (searchResults.length > 0) runLiveAnalysis(searchResults[0].id, searchResults[0].title, searchResults[0].artist); }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
                 Analyze
               </button>
+              {/* Live search dropdown */}
+              {showSearchDropdown && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#0a0a0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, overflow: "hidden", zIndex: 100, boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
+                  {isSearching ? (
+                    <div style={{ padding: "16px", textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Searching...</div>
+                  ) : searchResults.length === 0 ? (
+                    <div style={{ padding: "16px", textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>No songs found</div>
+                  ) : (
+                    <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                      {searchResults.map((r) => (
+                        <button
+                          key={r.id}
+                          onClick={() => runLiveAnalysis(r.id, r.title, r.artist)}
+                          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 14px", border: "none", background: "transparent", color: "white", cursor: "pointer", textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "background 0.15s" }}
+                          onMouseOver={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                          onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, rgba(74,144,226,0.2), rgba(155,81,224,0.2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14, color: "rgba(155,81,224,0.6)" }}>
+                              <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" />
+                              <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.5" />
+                            </svg>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.artist}</div>
+                          </div>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", flexShrink: 0, fontFamily: "monospace" }}>ANALYZE</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="samples">
               {sampleKeys.map(k => {

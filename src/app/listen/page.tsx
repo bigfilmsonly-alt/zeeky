@@ -95,7 +95,7 @@ export default function ListenNowPage() {
 
     async function fetchTopSongs() {
       try {
-        const res = await fetch("/api/songs/search?q=top&limit=10");
+        const res = await fetch("/api/songs?limit=20");
         if (!res.ok) throw new Error("API unavailable");
         const data = await res.json();
 
@@ -110,12 +110,28 @@ export default function ListenNowPage() {
           );
           setTopSongs(tracks);
 
-          const cards: MadeForYouData[] = tracks.slice(0, 5).map((t, i) => ({
-            title: t.title,
-            artist: t.artist,
-            dna: t.dna,
-            gradient: GRADIENTS[i % GRADIENTS.length],
-          }));
+          // Group songs by artist for Made For You section
+          const artistMap = new Map<string, TrackData[]>();
+          for (const t of tracks) {
+            const existing = artistMap.get(t.artist) || [];
+            existing.push(t);
+            artistMap.set(t.artist, existing);
+          }
+
+          // Pick one representative song per artist (highest DNA score), up to 5
+          const cards: MadeForYouData[] = [];
+          let gradientIdx = 0;
+          for (const [, artistTracks] of artistMap) {
+            if (cards.length >= 5) break;
+            const best = artistTracks.sort((a, b) => parseFloat(b.dna) - parseFloat(a.dna))[0];
+            cards.push({
+              title: best.title,
+              artist: best.artist,
+              dna: best.dna,
+              gradient: GRADIENTS[gradientIdx % GRADIENTS.length],
+            });
+            gradientIdx++;
+          }
           setMadeForYou(cards);
         }
         // If no results, fallback data stays
@@ -175,7 +191,7 @@ export default function ListenNowPage() {
             </svg>
             Preview
           </button>
-          <AppleMusicButton track="Scarface" artist="Zeeky" size="hero" />
+          <StreamingButtons track="Scarface" artist="Zeeky" size="md" />
         </div>
       </div>
 
@@ -183,12 +199,12 @@ export default function ListenNowPage() {
       <div className="flex justify-center mb-5">
         <div
           className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-semibold text-white"
-          style={{ background: "linear-gradient(135deg, #fa233b, #ff5e3a)" }}
+          style={{ background: "linear-gradient(135deg, #8b5cf6, #3b82f6)" }}
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-            <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.4-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.815.154 1.624.497 2.373.65 1.42 1.738 2.353 3.234 2.802.42.127.856.187 1.297.228.473.044.95.07 1.426.07 4.355.002 8.71.002 13.066 0 .39 0 .78-.015 1.17-.056.488-.05.964-.138 1.42-.328 1.454-.607 2.462-1.67 2.96-3.14.163-.48.253-.974.304-1.478.048-.48.07-.96.074-1.44V6.124z" />
+            <path d="M9 18V5l12-2v13M6 21a3 3 0 100-6 3 3 0 000 6zM18 19a3 3 0 100-6 3 3 0 000 6z" />
           </svg>
-          Listen free &middot; Play full tracks on Apple Music
+          Stream on any platform &middot; Spotify, Apple, YouTube, Deezer, Tidal
         </div>
       </div>
 
@@ -214,7 +230,7 @@ export default function ListenNowPage() {
                   <p className="text-[10px] text-text-muted/50 truncate">{t.artist}</p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <span className="text-[9px] font-mono text-accent-purple">{t.dna}%</span>
-                    <AppleMusicButton track={t.title} artist={t.artist} size="chip" />
+                    <StreamingButtons track={t.title} artist={t.artist} size="sm" />
                   </div>
                 </div>
               ))}
@@ -259,8 +275,8 @@ export default function ListenNowPage() {
                   {/* Add to Playlist */}
                   <AddToPlaylistButton songTitle={t.title} songArtist={t.artist} size="sm" />
 
-                  {/* Apple Music button */}
-                  <AppleMusicButton track={t.title} artist={t.artist} size="track" />
+                  {/* Streaming buttons */}
+                  <StreamingButtons track={t.title} artist={t.artist} size="sm" />
                 </div>
               ))}
         </div>

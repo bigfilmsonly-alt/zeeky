@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const radarArtists = [
   { name: "Drake", value: 0.95 },
@@ -33,35 +33,96 @@ const topCities = [
   { city: "Chicago", listeners: "19K" },
 ];
 
-const proximityResultsScarface = [
-  { song: "Scarface", artist: "Zeeky", proximity: 100.0, isSelf: true },
-  { song: "Harlem Shake", artist: "Future ft Young Thug", proximity: 87.0, isSelf: false },
-  { song: "Having Our Way", artist: "Migos ft Drake", proximity: 86.12, isSelf: false },
-  { song: "Golden Child", artist: "Lil Durk", proximity: 85.93, isSelf: false },
-  { song: "Said Sum", artist: "Moneybagg Yo", proximity: 85.02, isSelf: false },
-  { song: "What Happened To Virgil", artist: "Lil Durk ft Gunna", proximity: 84.82, isSelf: false },
-  { song: "Mop", artist: "Gunna ft Young Thug", proximity: 84.82, isSelf: false },
-  { song: "Sup Mate", artist: "Young Thug ft Future", proximity: 84.76, isSelf: false },
-  { song: "Poochie Gown", artist: "Gunna", proximity: 84.67, isSelf: false },
-  { song: "I'm The Plug", artist: "Drake & Future", proximity: 84.32, isSelf: false },
-];
+interface TrackInfo {
+  id: string;
+  artist: string;
+  title: string;
+  year?: number;
+  genre?: string;
+  dhsScore: number;
+  appleId?: string;
+}
 
-const proximityResultsGold = [
-  { song: "Gold", artist: "Zeeky", proximity: 100.0, isSelf: true },
-  { song: "Praise The Lord (Da Shine)", artist: "A$AP Rocky ft Skepta", proximity: 94.72, isSelf: false },
-  { song: "Walk Em Down", artist: "Metro Boomin & 21 Savage", proximity: 94.52, isSelf: false },
-  { song: "War Bout It", artist: "Lil Durk ft 21 Savage", proximity: 94.27, isSelf: false },
-  { song: "Love Sosa", artist: "Chief Keef", proximity: 94.09, isSelf: false },
-  { song: "Better", artist: "Khalid", proximity: 93.79, isSelf: false },
-  { song: "U-Digg", artist: "Lil Baby, 42 Dugg & Veeze", proximity: 93.66, isSelf: false },
-  { song: "Split", artist: "Yeat", proximity: 93.53, isSelf: false },
-  { song: "Poland", artist: "Lil Yachty", proximity: 93.43, isSelf: false },
-  { song: "Liability", artist: "Drake", proximity: 93.3, isSelf: false },
-];
+interface SimilarSong {
+  id: string;
+  artist: string;
+  title: string;
+  similarity: number;
+  genre?: string;
+  dhsScore: number;
+  appleId?: string;
+}
+
+interface SimilarsResponse {
+  song: TrackInfo;
+  similars: SimilarSong[];
+}
 
 export default function StudioPage() {
   const [activeTrack, setActiveTrack] = useState<"scarface" | "gold">("scarface");
-  const score = activeTrack === "scarface" ? 86.76 : 80.96;
+  const [trackIds, setTrackIds] = useState<{ scarface: string | null; gold: string | null }>({ scarface: null, gold: null });
+  const [similarsData, setSimilarsData] = useState<{ scarface: SimilarsResponse | null; gold: SimilarsResponse | null }>({ scarface: null, gold: null });
+  const [loading, setLoading] = useState(true);
+
+  // Fetch track IDs on mount
+  useEffect(() => {
+    async function fetchTrackIds() {
+      try {
+        const [scarfaceRes, goldRes] = await Promise.all([
+          fetch("/api/dna/search?q=Scarface&limit=1"),
+          fetch("/api/dna/search?q=Gold&limit=1"),
+        ]);
+        const scarfaceData = await scarfaceRes.json();
+        const goldData = await goldRes.json();
+
+        const scarfaceId = scarfaceData.results?.[0]?.id ?? null;
+        const goldId = goldData.results?.[0]?.id ?? null;
+
+        setTrackIds({ scarface: scarfaceId, gold: goldId });
+      } catch (err) {
+        console.error("Failed to fetch track IDs:", err);
+        setLoading(false);
+      }
+    }
+    fetchTrackIds();
+  }, []);
+
+  // Fetch similars when track IDs are available
+  useEffect(() => {
+    async function fetchSimilars() {
+      if (!trackIds.scarface && !trackIds.gold) return;
+      setLoading(true);
+      try {
+        const promises: Promise<Response>[] = [];
+        if (trackIds.scarface) promises.push(fetch(`/api/dna/similars?id=${trackIds.scarface}&limit=10`));
+        if (trackIds.gold) promises.push(fetch(`/api/dna/similars?id=${trackIds.gold}&limit=10`));
+
+        const responses = await Promise.all(promises);
+        const results = await Promise.all(responses.map((r) => r.json()));
+
+        let idx = 0;
+        const newSimilarsData = { ...similarsData };
+        if (trackIds.scarface) {
+          newSimilarsData.scarface = results[idx] as SimilarsResponse;
+          idx++;
+        }
+        if (trackIds.gold) {
+          newSimilarsData.gold = results[idx] as SimilarsResponse;
+        }
+        setSimilarsData(newSimilarsData);
+      } catch (err) {
+        console.error("Failed to fetch similars:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSimilars();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackIds]);
+
+  const currentSimilars = similarsData[activeTrack];
+  const score = currentSimilars?.song?.dhsScore ?? 0;
+  const similars = currentSimilars?.similars ?? [];
 
   return (
     <div className="space-y-5">
@@ -104,57 +165,85 @@ export default function StudioPage() {
       {/* Hit Prediction Score */}
       <div className="bg-surface border border-white/5 rounded-2xl p-4 text-center">
         <h3 className="text-[10px] text-text-muted uppercase tracking-wider mb-2">Hit Prediction Score</h3>
-        <div className="flex items-center justify-center gap-1 mb-2">
-          <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 text-text-muted/50">
-            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M8 7v4M8 5h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span className="text-[10px] text-text-muted/50">Based on 50 similar songs</span>
-        </div>
-        <div className="relative w-20 h-20 mx-auto mb-2">
-          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
-            <circle
-              cx="50" cy="50" r="42" fill="none" stroke="url(#scoreGrad)" strokeWidth="8" strokeLinecap="round"
-              strokeDasharray={`${score * 2.64} 264`}
-            />
-            <defs>
-              <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#3b82f6" />
-              </linearGradient>
-            </defs>
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-lg font-bold">{score.toFixed(1)}%</span>
+        {loading ? (
+          <div className="py-6">
+            <div className="w-5 h-5 mx-auto border-2 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin mb-2" />
+            <p className="text-[10px] text-text-muted/60">Analyzing...</p>
           </div>
-        </div>
-        <p className="text-xs text-green-400 font-medium">{score >= 85 ? "High Hit Potential" : "Strong Potential"}</p>
-        <p className="text-[10px] text-text-muted/50 mt-0.5">Calculated from proximity to Billboard-charting songs in our 50K+ database</p>
+        ) : (
+          <>
+            <div className="flex items-center justify-center gap-1 mb-2">
+              <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 text-text-muted/50">
+                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M8 7v4M8 5h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span className="text-[10px] text-text-muted/50">Based on {similars.length} similar songs</span>
+            </div>
+            <div className="relative w-20 h-20 mx-auto mb-2">
+              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+                <circle
+                  cx="50" cy="50" r="42" fill="none" stroke="url(#scoreGrad)" strokeWidth="8" strokeLinecap="round"
+                  strokeDasharray={`${score * 2.64} 264`}
+                />
+                <defs>
+                  <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#3b82f6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-lg font-bold">{score.toFixed(1)}%</span>
+              </div>
+            </div>
+            <p className="text-xs text-green-400 font-medium">{score >= 85 ? "High Hit Potential" : "Strong Potential"}</p>
+            <p className="text-[10px] text-text-muted/50 mt-0.5">Calculated from proximity to {similars.length} Billboard-charting songs in our 50K+ database</p>
+          </>
+        )}
       </div>
 
       {/* DNA Proximity Results */}
       <div className="bg-surface border border-white/5 rounded-2xl p-4">
         <h3 className="text-sm font-bold mb-0.5">DNA Proximity Results</h3>
         <p className="text-[10px] text-text-muted/60 mb-3">Closest matches in our database sorted by proximity</p>
-        <div className="space-y-1.5">
-          {(activeTrack === "scarface" ? proximityResultsScarface : proximityResultsGold).map((item, i) => (
-            <div key={i} className="flex items-center gap-2 py-1 border-b border-white/5 last:border-0">
-              <span className="w-4 text-[10px] text-text-muted/50 font-mono">{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <span className="text-xs truncate block">{item.song} - {item.artist}</span>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <span className={`text-xs font-mono ${item.isSelf ? "text-green-400" : "text-accent-purple"}`}>
-                  {item.proximity.toFixed(2)}%
-                </span>
-                {item.isSelf && (
-                  <span className="text-[9px] text-green-400/70 bg-green-400/10 px-1 rounded">Self</span>
-                )}
-              </div>
+        {loading ? (
+          <div className="py-6 text-center">
+            <div className="w-5 h-5 mx-auto border-2 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin mb-2" />
+            <p className="text-[10px] text-text-muted/60">Analyzing...</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              {/* Self entry at 100% */}
+              {currentSimilars?.song && (
+                <div className="flex items-center gap-2 py-1 border-b border-white/5">
+                  <span className="w-4 text-[10px] text-text-muted/50 font-mono">1</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs truncate block">{currentSimilars.song.title} - {currentSimilars.song.artist}</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs font-mono text-green-400">100.00%</span>
+                    <span className="text-[9px] text-green-400/70 bg-green-400/10 px-1 rounded">Self</span>
+                  </div>
+                </div>
+              )}
+              {similars.map((item, i) => (
+                <div key={item.id} className="flex items-center gap-2 py-1 border-b border-white/5 last:border-0">
+                  <span className="w-4 text-[10px] text-text-muted/50 font-mono">{i + 2}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs truncate block">{item.title} - {item.artist}</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs font-mono text-accent-purple">
+                      {(item.similarity * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="text-[10px] text-text-muted/40 mt-2 text-center">Showing top 10 of 50 total matches</p>
+            <p className="text-[10px] text-text-muted/40 mt-2 text-center">Showing top {similars.length} of {similars.length} total matches</p>
+          </>
+        )}
       </div>
 
       {/* Similar Artists Radar */}
