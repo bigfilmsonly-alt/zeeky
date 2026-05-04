@@ -79,6 +79,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     setState((s) => ({ ...s, currentTrack: track, isPlaying: false, progress: 0, duration: 0 }));
 
+    // Try MusicKit for full playback
+    if (track.appleId) {
+      try {
+        const mk = (window as any)?.MusicKit?.getInstance?.();
+        if (mk && mk.isAuthorized) {
+          await mk.setQueue({ songs: [String(track.appleId)] });
+          await mk.play();
+          setState((s) => ({ ...s, currentTrack: track, isPlaying: true }));
+          return; // Full song playing via MusicKit
+        }
+      } catch {
+        // Fall through to preview
+      }
+    }
+
     let url = track.previewUrl;
 
     // If no preview URL but has appleId, fetch from iTunes
