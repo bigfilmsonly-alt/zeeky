@@ -1,305 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  --background: #050507;
-  --foreground: #ededed;
-  --blue: #4a90e2;
-  --violet: #9b51e0;
-  --apple-red: #fa233b;
-  --text-muted: rgba(255, 255, 255, 0.55);
-  --line: rgba(255, 255, 255, 0.08);
-  --surface: #0a0a0f;
-  --surface-light: #111116;
+  --background: #ffffff;
+  --foreground: #1d1d1f;
+  --accent: #fa233b;
+  --blue: #0071e3;
+  --green: #34c759;
+  --text-muted: #86868b;
+  --text-tertiary: #aeaeb2;
+  --line: rgba(60,60,67,0.12);
+  --surface: #f5f5f7;
+  --surface-light: #fafafa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
   --color-blue: var(--blue);
-  --color-violet: var(--violet);
-  --color-apple-red: var(--apple-red);
+  --color-green: var(--green);
   --color-text-muted: var(--text-muted);
   --color-line: var(--line);
   --color-surface: var(--surface);
   --color-surface-light: var(--surface-light);
-  --font-sans: var(--font-inter), var(--font-geist-sans), Arial, Helvetica, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html {
   scroll-behavior: smooth;
-}
-
-/* Gradient text: blue -> violet */
-.gradient-text {
-  background: linear-gradient(135deg, #4a90e2, #9b51e0);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Glow effects */
-.glow-blue {
-  box-shadow: 0 0 40px rgba(74, 144, 226, 0.25), 0 0 80px rgba(74, 144, 226, 0.08);
-}
-
-.glow-violet {
-  box-shadow: 0 0 40px rgba(155, 81, 224, 0.25), 0 0 80px rgba(155, 81, 224, 0.08);
-}
-
-/* Animated gradient background */
-@keyframes gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradient-shift 8s ease infinite;
-}
-
-/* Pulse glow for status pill */
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* Ticker scroll */
-@keyframes ticker-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.animate-ticker {
-  animation: ticker-scroll 20s linear infinite;
-}
-
-/* Page transition */
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-page-in {
-  animation: page-in 0.25s ease-out;
-}
-
-/* Audio equalizer bars animation */
-@keyframes equalizer {
-  0% { height: 30%; }
-  100% { height: 100%; }
-}
-
-/* Skeleton loading pulse */
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.15; }
-  50% { opacity: 0.25; }
-}
-
-.skeleton {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
-}
-
-/* Section divider */
-.section-divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(74, 144, 226, 0.4), rgba(155, 81, 224, 0.4), transparent);
-}
-
-/* Card hover lift */
-.card-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(74, 144, 226, 0.15), 0 0 40px rgba(155, 81, 224, 0.08);
-}
-
-/* Glass card */
-.glass-card {
-  background: rgba(10, 10, 15, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-}
-
-/* ============ iPhone 17 Pro Max Frame (for /listen routes only) ============ */
-
-.iphone-page {
-  height: 100vh;
-  height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  background: radial-gradient(ellipse at 50% 50%, #0a0a1f 0%, #000 70%);
-}
-
-.iphone-ambient-1 {
-  position: absolute;
-  top: 15%;
-  left: 25%;
-  width: 500px;
-  height: 500px;
-  background: rgba(74, 144, 226, 0.06);
-  border-radius: 50%;
-  filter: blur(150px);
-  pointer-events: none;
-}
-
-.iphone-ambient-2 {
-  position: absolute;
-  bottom: 15%;
-  right: 25%;
-  width: 400px;
-  height: 400px;
-  background: rgba(155, 81, 224, 0.04);
-  border-radius: 50%;
-  filter: blur(150px);
-  pointer-events: none;
-}
-
-.iphone-device {
-  position: relative;
-  height: min(90dvh, 932px);
-  aspect-ratio: 430 / 932;
-  max-width: min(430px, 92vw);
-  background: linear-gradient(145deg, #2a2a2e, #1c1c1e, #2a2a2e);
-  border-radius: 55px;
-  padding: 10px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 0 0 3px #111,
-    0 30px 80px rgba(0, 0, 0, 0.6),
-    0 10px 30px rgba(0, 0, 0, 0.4);
-  z-index: 1;
-}
-
-.iphone-screen {
-  width: 100%;
-  height: 100%;
-  background: var(--background);
-  border-radius: 47px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.iphone-island {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 126px;
-  height: 36px;
-  background: #000;
-  border-radius: 20px;
-  z-index: 60;
-}
-
-.iphone-island::after {
-  content: "";
-  position: absolute;
-  right: 22px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 10px;
-  height: 10px;
-  background: radial-gradient(circle, #1a1a3e 30%, #0d0d1a 70%);
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.iphone-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding-top: 46px;
-}
-
-.iphone-content::-webkit-scrollbar {
-  display: none;
-}
-
-.iphone-tabbar {
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-start;
-  padding: 8px 2px 0;
-  background: rgba(5, 5, 7, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 0.5px solid rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
-}
-
-.iphone-home-area {
-  display: flex;
-  justify-content: center;
-  padding: 6px 0 8px;
-  background: rgba(5, 5, 7, 0.92);
-  flex-shrink: 0;
-}
-
-.iphone-home-bar {
-  width: 134px;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-}
-
-@property --glow-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes frame-glow {
-  0% { --glow-angle: 0deg; }
-  100% { --glow-angle: 360deg; }
-}
-
-.iphone-device::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: 57px;
-  background: conic-gradient(
-    from var(--glow-angle),
-    #4a90e2,
-    #9b51e0,
-    #4a90e2
-  );
-  opacity: 0.15;
-  z-index: -1;
-  animation: frame-glow 8s linear infinite;
 }
 
 /* Remove tap highlight on mobile */
@@ -307,7 +44,7 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ============ Haptic tap feedback ============ */
+/* Haptic tap feedback */
 button:active,
 a:active,
 [role="button"]:active {
@@ -315,7 +52,6 @@ a:active,
   transition: transform 0.1s ease;
 }
 
-/* Prevent tap feedback on non-interactive elements */
 button:active:disabled {
   transform: none;
 }

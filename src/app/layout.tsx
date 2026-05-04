@@ -45,7 +45,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#050507",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -58,7 +58,7 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
     >
-      <body className="min-h-screen bg-[#050507] text-white">
+      <body className="min-h-screen bg-white text-[#1d1d1f]">
         {children}
       </body>
     </html>

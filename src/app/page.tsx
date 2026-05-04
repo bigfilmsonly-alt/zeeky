@@ -164,12 +164,12 @@ function generatePlaylists(s: Sample): PlaylistDef[] {
   ).slice(0, 14);
 
   return [
-    { tag: "PURE DNA", tagColor: "#4a90e2", name: "Pure DNA Match", count: pureTracks.length, duration: "1h 22m", tracks: pureTracks.map(t => ({ t: t.t, a: t.a })) },
-    { tag: "TEMPO MATCH", tagColor: "#00ff88", name: "Tempo Twins", count: tempoTracks.length, duration: "58m", tracks: tempoTracks.map(t => ({ t: t.t, a: t.a })) },
-    { tag: "MOOD", tagColor: "#f5c542", name: "Mood Match", count: moodTracks.length, duration: "52m", tracks: moodTracks.map(t => ({ t: t.t, a: t.a })) },
-    { tag: "GENRE BRIDGE", tagColor: "#9b51e0", name: "Genre Cross-Cut", count: genreTracks.length, duration: "44m", tracks: genreTracks.map(t => ({ t: t.t, a: t.a })) },
+    { tag: "PURE DNA", tagColor: "#fa233b", name: "Pure DNA Match", count: pureTracks.length, duration: "1h 22m", tracks: pureTracks.map(t => ({ t: t.t, a: t.a })) },
+    { tag: "TEMPO MATCH", tagColor: "#34c759", name: "Tempo Twins", count: tempoTracks.length, duration: "58m", tracks: tempoTracks.map(t => ({ t: t.t, a: t.a })) },
+    { tag: "MOOD", tagColor: "#ff9f0a", name: "Mood Match", count: moodTracks.length, duration: "52m", tracks: moodTracks.map(t => ({ t: t.t, a: t.a })) },
+    { tag: "GENRE BRIDGE", tagColor: "#bf5af2", name: "Genre Cross-Cut", count: genreTracks.length, duration: "44m", tracks: genreTracks.map(t => ({ t: t.t, a: t.a })) },
     { tag: "ERA", tagColor: "#ff6b6b", name: "Era Mix", count: eraTracks.length, duration: "48m", tracks: eraTracks.map(t => ({ t: t.t, a: t.a })) },
-    { tag: "EDITORIAL", tagColor: "#6aa9ff", name: "Apple Music Curator Pick", count: curatorTracks.length, duration: "40m", tracks: curatorTracks.map(t => ({ t: t.t, a: t.a })) },
+    { tag: "EDITORIAL", tagColor: "#0071e3", name: "Apple Music Curator Pick", count: curatorTracks.length, duration: "40m", tracks: curatorTracks.map(t => ({ t: t.t, a: t.a })) },
   ];
 }
 
@@ -212,20 +212,18 @@ async function fetchPreview(track: string, artist: string): Promise<string> {
 
 // ─── COMPONENT ───
 export default function ZeekyPage() {
-  const [mode, setMode] = useState<"b2b" | "b2c">("b2b");
   const [sampleKey, setSampleKey] = useState("scarface");
   const [sample, setSample] = useState<Sample>(SAMPLES.scarface);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showResults, setShowResults] = useState(true);
   const [indexedFlash, setIndexedFlash] = useState(false);
-  const [resultsTab, setResultsTab] = useState("playlists");
   const [latency, setLatency] = useState(117);
   const [analyzeStep, setAnalyzeStep] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [genreAnimated, setGenreAnimated] = useState(true);
-  const [activeTab, setActiveTab] = useState("demo");
+  const [activeTab, setActiveTab] = useState("listen");
   const [displayScore, setDisplayScore] = useState(87);
   const [artworks, setArtworks] = useState<Record<string, string>>({});
   const [nowPlaying, setNowPlaying] = useState<{ track: string; artist: string } | null>(null);
@@ -233,6 +231,7 @@ export default function ZeekyPage() {
   const [queueIndex, setQueueIndex] = useState(-1);
   const [expandedPlaylist, setExpandedPlaylist] = useState<number | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistDef[]>(() => generatePlaylists(SAMPLES.scarface));
+  const [dnaSubTab, setDnaSubTab] = useState("radar");
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -262,9 +261,9 @@ export default function ZeekyPage() {
       if (e.code === "Space") { e.preventDefault(); toggleAudio(); }
       if (e.code === "Tab") {
         e.preventDefault();
-        const tabs = ["playlists", "neighbors", "radar", "genres", "market", "json"];
-        const cur = tabs.indexOf(resultsTab);
-        setResultsTab(tabs[(cur + 1) % tabs.length]);
+        const tabs = ["listen", "search", "library", "dna"];
+        const cur = tabs.indexOf(activeTab);
+        setActiveTab(tabs[(cur + 1) % tabs.length]);
       }
     };
     window.addEventListener("keydown", handler);
@@ -282,7 +281,6 @@ export default function ZeekyPage() {
         if (url) setArtworks(prev => ({ ...prev, [`${t}|${a}`]: url }));
       });
     });
-    // Also fetch for playlist tracks (first 4 of each for mosaic)
     const pl = generatePlaylists(sample);
     pl.forEach(p => {
       p.tracks.slice(0, 4).forEach(tr => {
@@ -323,17 +321,14 @@ export default function ZeekyPage() {
     else { audio.pause(); setIsPlaying(false); }
   }, []);
 
-  // Queue: play next track when current ends
   const playNextInQueue = useCallback(() => {
     setQueueIndex(prev => {
       const next = prev + 1;
       if (next < queue.length) {
         const t = queue[next];
-        // Fire off the next track
         setTimeout(() => playTrack(t.track, t.artist), 300);
         return next;
       }
-      // Queue finished — loop back to start
       if (queue.length > 0) {
         const t = queue[0];
         setTimeout(() => playTrack(t.track, t.artist), 300);
@@ -345,28 +340,31 @@ export default function ZeekyPage() {
     });
   }, [queue]);
 
-  // Start a full playlist: build queue from all neighbors + known tracks, then play
-  const startPlaylist = useCallback(() => {
-    // Build a big playlist from all samples' neighbors
+  const startPlaylist = useCallback((playlistTracks?: { t: string; a: string }[]) => {
     const allTracks: { track: string; artist: string }[] = [];
     const seen = new Set<string>();
-    // Start with current sample's neighbors
-    for (const n of sample.neighbors) {
-      const key = `${n.t}|${n.a}`;
-      if (!seen.has(key)) { seen.add(key); allTracks.push({ track: n.t, artist: n.a }); }
-    }
-    // Add neighbors from other samples
-    for (const s of Object.values(SAMPLES)) {
-      for (const n of s.neighbors) {
+    if (playlistTracks) {
+      for (const n of playlistTracks) {
         const key = `${n.t}|${n.a}`;
         if (!seen.has(key)) { seen.add(key); allTracks.push({ track: n.t, artist: n.a }); }
+      }
+    } else {
+      for (const n of sample.neighbors) {
+        const key = `${n.t}|${n.a}`;
+        if (!seen.has(key)) { seen.add(key); allTracks.push({ track: n.t, artist: n.a }); }
+      }
+      for (const s of Object.values(SAMPLES)) {
+        for (const n of s.neighbors) {
+          const key = `${n.t}|${n.a}`;
+          if (!seen.has(key)) { seen.add(key); allTracks.push({ track: n.t, artist: n.a }); }
+        }
       }
     }
     setQueue(allTracks);
     setQueueIndex(0);
     if (allTracks.length > 0) {
       playTrack(allTracks[0].track, allTracks[0].artist);
-      showToast(`Playing ${allTracks.length} tracks back to back`);
+      showToast(`Playing ${allTracks.length} tracks`);
     }
   }, [sample, playTrack, showToast]);
 
@@ -377,7 +375,6 @@ export default function ZeekyPage() {
     setSampleKey(key);
 
     if (s.indexed) {
-      // INDEXED path: green flash, instant recall
       setIsAnalyzing(true);
       setShowResults(false);
       setIndexedFlash(true);
@@ -390,7 +387,6 @@ export default function ZeekyPage() {
         setLatency(22);
         setGenreAnimated(false);
         setTimeout(() => setGenreAnimated(true), 50);
-        // Animated score counter
         let frame = 0;
         const target = s.score;
         const dur = 40;
@@ -403,7 +399,6 @@ export default function ZeekyPage() {
         }, 20);
       }, 400);
     } else {
-      // UNRELEASED path: full analyzing animation
       setIsAnalyzing(true);
       setShowResults(false);
       setGenreAnimated(false);
@@ -461,7 +456,6 @@ export default function ZeekyPage() {
     }, 250);
   }, []);
 
-  // Deep analysis: pulls from iTunes + Deezer + related artists to auto-populate playlists
   const runLiveAnalysis = useCallback(async (songId: string, title: string, artist: string) => {
     if (isAnalyzing) return;
     const displayName = artist && artist !== title ? `${title} — ${artist}` : title;
@@ -493,7 +487,6 @@ export default function ZeekyPage() {
     const isLocalId = !songId.startsWith("itunes-") && !songId.startsWith("deezer-") && !songId.startsWith("search-");
 
     try {
-      // 1. Local DB similarity
       if (isLocalId) {
         try {
           const res = await fetch(`/api/songs/${encodeURIComponent(songId)}/similar?limit=50`);
@@ -504,7 +497,6 @@ export default function ZeekyPage() {
         } catch {}
       }
 
-      // 2. iTunes deep pull — artist catalog (50 songs)
       try {
         const r = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=50&country=US`);
         if (r.ok) {
@@ -515,7 +507,6 @@ export default function ZeekyPage() {
         }
       } catch {}
 
-      // 3. Deezer deep pull (50 songs)
       try {
         const r = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(searchTerm)}&limit=50`);
         if (r.ok) {
@@ -526,7 +517,6 @@ export default function ZeekyPage() {
         }
       } catch {}
 
-      // 4. Deezer related artists — pull top tracks from each
       try {
         const ar = await fetch(`https://api.deezer.com/search/artist?q=${encodeURIComponent(searchTerm)}&limit=1`);
         if (ar.ok) {
@@ -580,7 +570,6 @@ export default function ZeekyPage() {
     }
   }, [isAnalyzing]);
 
-  // Auto-analyze from raw search query (Enter key or Analyze button without picking dropdown)
   const analyzeFromQuery = useCallback((query: string) => {
     if (isAnalyzing || !query.trim()) return;
     setShowSearchDropdown(false);
@@ -596,584 +585,622 @@ export default function ZeekyPage() {
     return [160 + r * Math.cos(angle), 120 + r * Math.sin(angle)];
   });
 
-  const curTime = Math.floor((progress / 100) * 30);
-  const remTime = 30 - curTime;
-
   const sampleKeys = Object.keys(SAMPLES) as string[];
+  const sampleChips = [
+    { key: "harlem", label: "Harlem Shake" },
+    { key: "having", label: "Having Our Way" },
+    { key: "golden_child", label: "Golden Child" },
+    { key: "scarface", label: "Scarface" },
+  ];
 
+  // ─── SEARCH INPUT (shared between Listen Now and Search tabs) ───
+  const renderSearchInput = (large?: boolean) => (
+    <div className={`z-search-wrap ${large ? "z-search-large" : ""}`}>
+      <div className="z-search-bar">
+        <svg className="z-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" /></svg>
+        <input
+          type="text"
+          placeholder="Search songs, artists..."
+          value={searchQuery}
+          onChange={(e) => handleSearchInput(e.target.value)}
+          onFocus={() => { if (searchResults.length > 0) setShowSearchDropdown(true); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (searchResults.length > 0) runLiveAnalysis(searchResults[0].id, searchResults[0].title, searchResults[0].artist); else analyzeFromQuery(searchQuery); } }}
+        />
+        {searchQuery && (
+          <button className="z-search-clear" onClick={() => { setSearchQuery(""); setSearchResults([]); setShowSearchDropdown(false); }}>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z" /></svg>
+          </button>
+        )}
+      </div>
+      {showSearchDropdown && (
+        <div className="z-search-dropdown">
+          {isSearching ? (
+            <div className="z-search-msg">Searching...</div>
+          ) : searchResults.length === 0 ? (
+            <div className="z-search-msg">No results found</div>
+          ) : (
+            searchResults.map((r) => (
+              <button key={r.id} className="z-search-result" onClick={() => { runLiveAnalysis(r.id, r.title, r.artist); setActiveTab("listen"); }}>
+                <div className="z-search-result-icon">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" /><circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.5" /></svg>
+                </div>
+                <div className="z-search-result-text">
+                  <div className="z-search-result-title">{r.title}</div>
+                  <div className="z-search-result-artist">{r.artist}</div>
+                </div>
+                <svg className="z-search-result-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  // ─── RENDER ───
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
 
-      <div className="app">
-        {/* TOPBAR */}
-        <div className="topbar">
-          <div className="brand">
-            <div className="brand-mark"><span>Z</span></div>
-            <span>ZEEKY</span>
-          </div>
-          <div className="status-pill">
-            <span className="dot" />
-            <span>API &middot; LIVE &middot; 100M</span>
-          </div>
-          <button className="menu-btn" onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-          </button>
-        </div>
+      <div className="z-app">
+        {/* ━━━━━━━━━━━━━ TAB: LISTEN NOW ━━━━━━━━━━━━━ */}
+        {activeTab === "listen" && (
+          <div className="z-screen">
+            {/* Top bar */}
+            <div className="z-topbar">
+              <div className="z-logo"><img src="/zeeky-logo.png" alt="Zeeky" style={{width:28,height:28,objectFit:"contain"}} /> ZEEKY</div>
+              <div className="z-status-dot" />
+            </div>
 
-        {/* HERO */}
-        <section className="hero">
-          <div className="hero-eyebrow">
-            <span className="dot" />
-            <span>PATENTED &middot; 84 ATTRIBUTES &middot; 100M SONGS</span>
-          </div>
-          <h1>The recommendation engine, <em>running live</em> in your browser.</h1>
-          <p className="hero-sub">Drop a song. Get the 25 nearest neighbors in 84-dimensional DNA space. The same engine we license to DSPs.</p>
-          <div className="audience-toggle">
-            <button className={`audience-btn ${mode === "b2b" ? "active" : ""}`} onClick={() => setMode("b2b")}>
-              <span className="micro">&#x25B8; FOR DSPs</span><span>License the Engine</span>
-            </button>
-            <button className={`audience-btn b2c ${mode === "b2c" ? "active" : ""}`} onClick={() => setMode("b2c")}>
-              <span className="micro">&#x25B8; FOR LISTENERS</span><span>Try the Player</span>
-            </button>
-          </div>
-        </section>
+            {/* Search hero */}
+            <div className="z-listen-hero">
+              {renderSearchInput(true)}
 
-        {/* DEMO CARD */}
-        <div className="demo-card">
-          <div className="demo-header">
-            <div className="demo-tag"><span className="dot" /><span>LIVE ENGINE &middot; DNA-V3.2</span></div>
-            <div className="demo-meta">&#9201; {latency}ms</div>
-          </div>
-          <div className="input-zone">
-            <div className="input-label">&#x25B8; ANALYZE A SEED TRACK</div>
-            <div className="input-row" style={{ position: "relative" }}>
-              <input
-                type="text"
-                placeholder="Search any artist or song — YMTK, Drake, Afro house..."
-                value={searchQuery}
-                onChange={(e) => handleSearchInput(e.target.value)}
-                onFocus={() => { if (searchResults.length > 0) setShowSearchDropdown(true); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (searchResults.length > 0) runLiveAnalysis(searchResults[0].id, searchResults[0].title, searchResults[0].artist); else analyzeFromQuery(searchQuery); } }}
-              />
-              <button className="analyze-btn" onClick={() => { if (searchResults.length > 0) runLiveAnalysis(searchResults[0].id, searchResults[0].title, searchResults[0].artist); else analyzeFromQuery(searchQuery); }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-                Analyze
-              </button>
-              {/* Live search dropdown */}
-              {showSearchDropdown && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#0a0a0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, overflow: "hidden", zIndex: 100, boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
-                  {isSearching ? (
-                    <div style={{ padding: "16px", textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Searching...</div>
-                  ) : searchResults.length === 0 ? (
-                    <div style={{ padding: "16px", textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>No songs found</div>
-                  ) : (
-                    <div style={{ maxHeight: 240, overflowY: "auto" }}>
-                      {searchResults.map((r) => (
-                        <button
-                          key={r.id}
-                          onClick={() => runLiveAnalysis(r.id, r.title, r.artist)}
-                          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 14px", border: "none", background: "transparent", color: "white", cursor: "pointer", textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "background 0.15s" }}
-                          onMouseOver={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
-                          onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, rgba(74,144,226,0.2), rgba(155,81,224,0.2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14, color: "rgba(155,81,224,0.6)" }}>
-                              <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" />
-                              <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.5" />
-                            </svg>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</div>
-                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.artist}</div>
-                          </div>
-                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", flexShrink: 0, fontFamily: "monospace" }}>ANALYZE</div>
-                        </button>
-                      ))}
+              {/* Sample chips */}
+              <div className="z-chips">
+                {sampleChips.map(c => (
+                  <button
+                    key={c.key}
+                    className={`z-chip ${sampleKey === c.key ? "active" : ""}`}
+                    onClick={() => { runAnalysis(c.key); }}
+                  >
+                    {SAMPLES[c.key].indexed && <span className="z-chip-dot" />}
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Indexed flash */}
+            {indexedFlash && (
+              <div className="z-indexed-flash">INDEXED &middot; INSTANT RECALL &middot; 22ms</div>
+            )}
+
+            {/* Analyzing animation */}
+            {isAnalyzing && !indexedFlash && (
+              <div className="z-analyzing">
+                <div className="z-analyzing-bars">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <div key={i} className="z-analyzing-bar" style={{ animationDelay: `${i * 0.12}s` }} />
+                  ))}
+                </div>
+                <div className="z-analyzing-label">EXTRACTING 84 ATTRIBUTES</div>
+                <div className="z-analyzing-step">{analyzeStep}</div>
+              </div>
+            )}
+
+            {/* Results: playlist cards */}
+            {showResults && !isAnalyzing && (
+              <div className="z-results">
+                {/* Song header */}
+                <div className="z-song-header">
+                  <div className="z-song-art">
+                    {getArt(sample.track, sample.artist)
+                      ? <img src={getArt(sample.track, sample.artist)} alt="" />
+                      : <div className="z-art-placeholder" />
+                    }
+                  </div>
+                  <div className="z-song-meta">
+                    <div className="z-song-title">{sample.track}</div>
+                    <div className="z-song-artist">{sample.artist}</div>
+                    <div className="z-song-badges">
+                      <span className={`z-badge ${sample.indexed ? "indexed" : "new"}`}>
+                        {sample.indexed ? "INDEXED" : "NEW"}
+                      </span>
+                      <span className="z-badge score">{displayScore} DNA</span>
+                      <span className="z-badge latency">{latency}ms</span>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="samples">
-              {sampleKeys.map(k => {
-                const s = SAMPLES[k];
-                return (
-                  <button
-                    key={k}
-                    className={`sample-chip ${sampleKey === k ? "active" : ""} ${s.indexed ? "indexed" : ""}`}
-                    onClick={() => runAnalysis(k)}
-                  >
-                    {s.indexed && <span className="indexed-dot" />}
-                    {s.track.length > 14 ? s.track.slice(0, 14) + "..." : s.track}
+                  </div>
+                  <button className="z-play-hero" onClick={() => playTrack(sample.track, sample.artist)}>
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                   </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* INDEXED FLASH */}
-          {indexedFlash && (
-            <div className="indexed-flash">
-              <div className="indexed-flash-text">INDEXED &middot; INSTANT RECALL &middot; 22ms</div>
-            </div>
-          )}
-
-          {/* ANALYZING ANIMATION */}
-          {isAnalyzing && !indexedFlash && !sample.indexed && (
-            <div className="analyzing">
-              <div className="analyzing-bars">
-                {Array.from({ length: 7 }, (_, i) => (
-                  <div key={i} className="analyzing-bar" style={{ animationDelay: `${i * 0.1}s` }} />
-                ))}
-              </div>
-              <div className="analyzing-text">&#x25B8; EXTRACTING 84 ATTRIBUTES</div>
-              <div className="analyzing-step">{analyzeStep}</div>
-            </div>
-          )}
-
-          {/* RESULTS */}
-          {showResults && !isAnalyzing && (
-            <div className="results">
-              <div className="results-header">
-                <div className="results-art">
-                  {getArt(sample.track, sample.artist)
-                    ? <img src={getArt(sample.track, sample.artist)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />
-                    : <div className="art-placeholder" />
-                  }
                 </div>
-                <div className="results-meta">
-                  <div className="results-track">{sample.track}</div>
-                  <div className="results-artist">{sample.artist} &middot; {sample.album}</div>
-                  <span className={`results-isrc ${sample.indexed ? "indexed" : "new"}`}>
-                    {sample.indexed ? "INDEXED" : "NEW"}
-                  </span>
-                </div>
-                <div className="results-score">
-                  <div className="results-score-num">{displayScore}</div>
-                  <div className="results-score-label">DNA Match</div>
-                </div>
-              </div>
 
-              {/* TABS */}
-              <div className="results-tabs">
-                {["playlists", "neighbors", "radar", "genres", "market", "json"].map(t => (
-                  <button
-                    key={t}
-                    className={`results-tab ${resultsTab === t ? "active" : ""}`}
-                    onClick={() => { setResultsTab(t); if (t === "genres") setTimeout(() => setGenreAnimated(true), 50); }}
-                  >
-                    {t === "playlists" ? <>Playlists <span className="badge">6</span></> :
-                     t === "json" ? "API Response" :
-                     t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
-              </div>
-
-              {/* PLAYLISTS TAB */}
-              {resultsTab === "playlists" && (
-                <div className="playlists-container">
+                {/* 6 playlist cards */}
+                <div className="z-playlists-grid">
                   {playlists.map((pl, idx) => (
-                    <div key={idx} className={`playlist-card ${expandedPlaylist === idx ? "expanded" : ""}`}>
-                      <div className="playlist-head" onClick={() => setExpandedPlaylist(expandedPlaylist === idx ? null : idx)}>
-                        <div className="playlist-cover">
+                    <div key={idx} className={`z-playlist-card ${expandedPlaylist === idx ? "expanded" : ""}`}>
+                      <div className="z-playlist-header" onClick={() => setExpandedPlaylist(expandedPlaylist === idx ? null : idx)}>
+                        <div className="z-playlist-mosaic">
                           {pl.tracks.slice(0, 4).map((tr, ti) => (
-                            <div key={ti} className="playlist-cover-cell">
+                            <div key={ti} className="z-mosaic-cell">
                               {getArt(tr.t, tr.a)
-                                ? <img src={getArt(tr.t, tr.a)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                : <div className="art-placeholder-small" />
+                                ? <img src={getArt(tr.t, tr.a)} alt="" />
+                                : <div className="z-art-placeholder-sm" />
                               }
                             </div>
                           ))}
                         </div>
-                        <div className="playlist-info">
-                          <div className="playlist-tag" style={{ color: pl.tagColor, borderColor: pl.tagColor + "44", background: pl.tagColor + "18" }}>{pl.tag}</div>
-                          <div className="playlist-name">{pl.name}</div>
-                          <div className="playlist-sub">{pl.count} tracks &middot; {pl.duration}</div>
+                        <div className="z-playlist-info">
+                          <div className="z-playlist-tag" style={{ color: pl.tagColor }}>{pl.tag}</div>
+                          <div className="z-playlist-name">{pl.name}</div>
+                          <div className="z-playlist-sub">{pl.count} tracks &middot; {pl.duration}</div>
                         </div>
-                        <div className="playlist-chevron">{expandedPlaylist === idx ? "\u25B2" : "\u25BC"}</div>
+                        <button className="z-playlist-play" onClick={(e) => { e.stopPropagation(); startPlaylist(pl.tracks); }}>
+                          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                        </button>
                       </div>
+
                       {expandedPlaylist === idx && (
-                        <div className="playlist-body">
-                          <div className="playlist-tracks">
-                            {pl.tracks.map((tr, ti) => (
-                              <div key={ti} className="pl-track" onClick={() => playTrack(tr.t, tr.a)}>
-                                <div className="pl-track-num">{String(ti + 1).padStart(2, "0")}</div>
-                                <div className="pl-track-art">
-                                  {getArt(tr.t, tr.a)
-                                    ? <img src={getArt(tr.t, tr.a)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                    : <div className="art-placeholder-tiny" />
-                                  }
-                                </div>
-                                <div className="pl-track-info">
-                                  <div className="pl-track-title">{tr.t}</div>
-                                  <div className="pl-track-artist">{tr.a}</div>
-                                </div>
-                                <button className="pl-track-play" onClick={(e) => { e.stopPropagation(); playTrack(tr.t, tr.a); }}>
-                                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                                </button>
+                        <div className="z-playlist-body">
+                          {pl.tracks.map((tr, ti) => (
+                            <div key={ti} className="z-pl-track" onClick={() => playTrack(tr.t, tr.a)}>
+                              <div className="z-pl-num">{String(ti + 1).padStart(2, "0")}</div>
+                              <div className="z-pl-art">
+                                {getArt(tr.t, tr.a)
+                                  ? <img src={getArt(tr.t, tr.a)} alt="" />
+                                  : <div className="z-art-placeholder-xs" />
+                                }
                               </div>
-                            ))}
-                          </div>
-                          <div className="playlist-actions">
-                            <button className="playlist-action-btn apple-btn" onClick={() => playTrack(pl.tracks[0].t, pl.tracks[0].a)}>
-                              <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14 }}><path d="M8 5v14l11-7z" /></svg>
-                              Open in Apple Music
-                            </button>
-                            <button className="playlist-action-btn export-btn" onClick={() => showToast(`Playlist "${pl.name}" exported`)}>
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                              Export
-                            </button>
-                          </div>
+                              <div className="z-pl-info">
+                                <div className="z-pl-title">{tr.t}</div>
+                                <div className="z-pl-artist">{tr.a}</div>
+                              </div>
+                              <button className="z-pl-play-btn" onClick={(e) => { e.stopPropagation(); playTrack(tr.t, tr.a); }}>
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
-              )}
+              </div>
+            )}
+          </div>
+        )}
 
-              {/* NEIGHBORS TAB */}
-              {resultsTab === "neighbors" && (
-                <div className="neighbors">
-                  {sample.neighbors.map((n, i) => (
-                    <div key={i} className="neighbor" onClick={() => playTrack(n.t, n.a)} style={{ cursor: "pointer" }}>
-                      <div className="neighbor-rank">
-                        {nowPlaying?.track === n.t
-                          ? <span style={{ color: "var(--blue-2)" }}>&#9654;</span>
-                          : String(i + 1).padStart(2, "0")}
-                      </div>
-                      <div className="neighbor-art">
-                        {getArt(n.t, n.a)
-                          ? <img src={getArt(n.t, n.a)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : <div className="art-placeholder-small" style={{ width: "100%", height: "100%" }} />
-                        }
-                      </div>
-                      <div className="neighbor-info">
-                        <div className="neighbor-title" style={nowPlaying?.track === n.t ? { color: "var(--blue-2)" } : undefined}>{n.t}</div>
-                        <div className="neighbor-artist">{n.a}</div>
-                      </div>
-                      <div className="neighbor-bar"><div className="neighbor-bar-fill" style={{ width: `${n.p}%` }} /></div>
-                      <div className="neighbor-pct">{n.p.toFixed(1)}%</div>
-                      <button className="neighbor-apple" onClick={(e) => { e.stopPropagation(); playTrack(n.t, n.a); }}>
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+        {/* ━━━━━━━━━━━━━ TAB: SEARCH ━━━━━━━━━━━━━ */}
+        {activeTab === "search" && (
+          <div className="z-screen">
+            <div className="z-topbar">
+              <div className="z-topbar-title">Search</div>
+            </div>
+            <div className="z-search-fullscreen">
+              {renderSearchInput(true)}
+              <div className="z-trending-section">
+                <div className="z-section-label">Trending</div>
+                <div className="z-trending-cards">
+                  {sampleKeys.map(k => {
+                    const s = SAMPLES[k];
+                    const art = getArt(s.track, s.artist);
+                    return (
+                      <button key={k} className="z-trending-card" onClick={() => { runAnalysis(k); setActiveTab("listen"); }}>
+                        <div className="z-trending-art">
+                          {art ? <img src={art} alt="" /> : <div className="z-art-placeholder" />}
+                        </div>
+                        <div className="z-trending-title">{s.track}</div>
+                        <div className="z-trending-artist">{s.artist}</div>
                       </button>
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Quick results from sample data */}
+              {searchQuery && !showSearchDropdown && (
+                <div className="z-sample-results">
+                  {sampleKeys.filter(k => {
+                    const s = SAMPLES[k];
+                    const q = searchQuery.toLowerCase();
+                    return s.track.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q);
+                  }).map(k => {
+                    const s = SAMPLES[k];
+                    return (
+                      <button key={k} className="z-sample-result-row" onClick={() => { runAnalysis(k); setActiveTab("listen"); }}>
+                        <div className="z-sample-result-art">
+                          {getArt(s.track, s.artist) ? <img src={getArt(s.track, s.artist)} alt="" /> : <div className="z-art-placeholder-sm" />}
+                        </div>
+                        <div className="z-sample-result-info">
+                          <div className="z-sample-result-title">{s.track}</div>
+                          <div className="z-sample-result-artist">{s.artist}</div>
+                        </div>
+                        <span className={`z-badge ${s.indexed ? "indexed" : "new"}`}>{s.indexed ? "INDEXED" : "NEW"}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
+            </div>
+          </div>
+        )}
 
-              {/* RADAR TAB */}
-              {resultsTab === "radar" && (
-                <div className="radar-wrap">
-                  <svg className="radar-svg" viewBox="0 0 320 240">
+        {/* ━━━━━━━━━━━━━ TAB: LIBRARY ━━━━━━━━━━━━━ */}
+        {activeTab === "library" && (
+          <div className="z-screen">
+            <div className="z-topbar">
+              <div className="z-topbar-title">Library</div>
+            </div>
+            <div className="z-library">
+              <div className="z-section-label">Your DNA Playlists</div>
+              <div className="z-library-seed">
+                <div className="z-library-seed-art">
+                  {getArt(sample.track, sample.artist) ? <img src={getArt(sample.track, sample.artist)} alt="" /> : <div className="z-art-placeholder" />}
+                </div>
+                <div>
+                  <div className="z-library-seed-title">Seed: {sample.track}</div>
+                  <div className="z-library-seed-artist">{sample.artist} &middot; {playlists.length} playlists</div>
+                </div>
+              </div>
+
+              {playlists.map((pl, idx) => (
+                <div key={idx} className={`z-library-playlist ${expandedPlaylist === idx ? "expanded" : ""}`}>
+                  <div className="z-library-pl-header" onClick={() => setExpandedPlaylist(expandedPlaylist === idx ? null : idx)}>
+                    <div className="z-library-pl-mosaic">
+                      {pl.tracks.slice(0, 4).map((tr, ti) => (
+                        <div key={ti} className="z-mosaic-cell">
+                          {getArt(tr.t, tr.a) ? <img src={getArt(tr.t, tr.a)} alt="" /> : <div className="z-art-placeholder-sm" />}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="z-library-pl-info">
+                      <div className="z-library-pl-name">{pl.name}</div>
+                      <div className="z-library-pl-sub">{pl.count} tracks &middot; {pl.duration}</div>
+                    </div>
+                    <button className="z-playlist-play" onClick={(e) => { e.stopPropagation(); startPlaylist(pl.tracks); }}>
+                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    </button>
+                  </div>
+                  {expandedPlaylist === idx && (
+                    <div className="z-playlist-body">
+                      {pl.tracks.map((tr, ti) => (
+                        <div key={ti} className="z-pl-track" onClick={() => playTrack(tr.t, tr.a)}>
+                          <div className="z-pl-num">{String(ti + 1).padStart(2, "0")}</div>
+                          <div className="z-pl-art">
+                            {getArt(tr.t, tr.a) ? <img src={getArt(tr.t, tr.a)} alt="" /> : <div className="z-art-placeholder-xs" />}
+                          </div>
+                          <div className="z-pl-info">
+                            <div className="z-pl-title">{tr.t}</div>
+                            <div className="z-pl-artist">{tr.a}</div>
+                          </div>
+                          <button className="z-pl-play-btn" onClick={(e) => { e.stopPropagation(); playTrack(tr.t, tr.a); }}>
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Queue section */}
+              {queue.length > 0 && (
+                <div className="z-queue-section">
+                  <div className="z-section-label">Queue</div>
+                  <div className="z-queue-controls">
+                    <button className="z-queue-btn" onClick={() => { if (queueIndex > 0) { const prev = queue[queueIndex - 1]; setQueueIndex(queueIndex - 1); playTrack(prev.track, prev.artist); } }}>
+                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
+                    </button>
+                    <button className="z-queue-btn primary" onClick={toggleAudio}>
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        {isPlaying ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M8 5v14l11-7z" />}
+                      </svg>
+                    </button>
+                    <button className="z-queue-btn" onClick={() => playNextInQueue()}>
+                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+                    </button>
+                    <span className="z-queue-count">{queueIndex + 1} / {queue.length}</span>
+                  </div>
+                  <div className="z-queue-list">
+                    {queue.slice(Math.max(0, queueIndex - 1), queueIndex + 5).map((t, i) => {
+                      const realIdx = Math.max(0, queueIndex - 1) + i;
+                      return (
+                        <div key={realIdx} className={`z-queue-item ${realIdx === queueIndex ? "active" : ""}`} onClick={() => { setQueueIndex(realIdx); playTrack(t.track, t.artist); }}>
+                          <div className="z-queue-item-art">
+                            {getArt(t.track, t.artist) ? <img src={getArt(t.track, t.artist)} alt="" /> : <div className="z-art-placeholder-xs" />}
+                          </div>
+                          <div className="z-queue-item-info">
+                            <div className="z-queue-item-title">{t.track}</div>
+                            <div className="z-queue-item-artist">{t.artist}</div>
+                          </div>
+                          {realIdx === queueIndex && isPlaying && (
+                            <div className="z-eq-bars">
+                              <div className="z-eq-bar" /><div className="z-eq-bar" /><div className="z-eq-bar" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ━━━━━━━━━━━━━ TAB: DNA ━━━━━━━━━━━━━ */}
+        {activeTab === "dna" && (
+          <div className="z-screen">
+            <div className="z-topbar">
+              <div className="z-topbar-title">DNA</div>
+            </div>
+            <div className="z-dna">
+              {/* Engine explanation */}
+              <div className="z-dna-hero">
+                <div className="z-dna-eyebrow">THE ENGINE</div>
+                <h2 className="z-dna-h2">Tags are subjective. DNA is math.</h2>
+                <p className="z-dna-p">DSPs rely on human-tagged metadata. We extract 84 mathematical attributes from the audio itself and project every song onto a unit sphere in Hilbert space. Recommendation becomes geometry.</p>
+              </div>
+
+              {/* Pillars */}
+              <div className="z-pillars">
+                <div className="z-pillar">
+                  <div className="z-pillar-label">INDEX</div>
+                  <div className="z-pillar-title">100M songs, fingerprinted.</div>
+                  <div className="z-pillar-desc">Continuously expanding. Every song ranked by genre, tempo, mood, and Billboard correlation across 84 attributes.</div>
+                </div>
+                <div className="z-pillar">
+                  <div className="z-pillar-label">MATCH</div>
+                  <div className="z-pillar-title">Proximity in 84-D space.</div>
+                  <div className="z-pillar-desc">Find the 25 nearest neighbors to any track in &lt;120ms. Distance is the angle between two vectors in Hilbert space.</div>
+                </div>
+                <div className="z-pillar">
+                  <div className="z-pillar-label">GENERATE</div>
+                  <div className="z-pillar-title">6 playlists per seed.</div>
+                  <div className="z-pillar-desc">Pure DNA, Tempo, Mood, Genre, Era Mix, and Curator Pick. Every seed generates six listenable playlists instantly.</div>
+                </div>
+              </div>
+
+              {/* Sub-tabs for DNA deep dive */}
+              <div className="z-dna-tabs">
+                {["radar", "neighbors", "genres", "market", "json"].map(t => (
+                  <button key={t} className={`z-dna-tab ${dnaSubTab === t ? "active" : ""}`} onClick={() => { setDnaSubTab(t); if (t === "genres") { setGenreAnimated(false); setTimeout(() => setGenreAnimated(true), 50); } }}>
+                    {t === "json" ? "API" : t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Radar */}
+              {dnaSubTab === "radar" && (
+                <div className="z-radar">
+                  <svg className="z-radar-svg" viewBox="0 0 320 240">
                     <defs>
                       <radialGradient id="rg" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stopColor="#4a90e2" stopOpacity="0.6" />
-                        <stop offset="100%" stopColor="#9b51e0" stopOpacity="0.1" />
+                        <stop offset="0%" stopColor="#fa233b" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#fa233b" stopOpacity="0.05" />
                       </radialGradient>
                     </defs>
-                    <g stroke="rgba(255,255,255,0.08)" fill="none">
+                    <g stroke="rgba(0,0,0,0.06)" fill="none">
                       {[100, 75, 50, 25].map(r => <circle key={r} cx="160" cy="120" r={r} />)}
                     </g>
                     <polygon
                       points={radarPoints.map(p => p.join(",")).join(" ")}
-                      fill="url(#rg)" stroke="#4a90e2" strokeWidth="1.5"
+                      fill="url(#rg)" stroke="#fa233b" strokeWidth="1.5"
                     />
                     {radarPoints.map(([x, y], i) => (
-                      <circle key={i} cx={x} cy={y} r="3" fill="#4a90e2" />
+                      <circle key={i} cx={x} cy={y} r="3" fill="#fa233b" />
                     ))}
                     {radarKeys.map((k, i) => {
                       const a = (i / radarKeys.length) * Math.PI * 2 - Math.PI / 2;
                       return (
                         <text key={k} x={160 + 115 * Math.cos(a)} y={120 + 115 * Math.sin(a)}
                           textAnchor="middle" dominantBaseline="middle"
-                          fill="rgba(255,255,255,0.65)" fontFamily="JetBrains Mono,monospace" fontSize="9" fontWeight="500">
+                          fill="#86868b" fontFamily="-apple-system, 'SF Mono', monospace" fontSize="9" fontWeight="500">
                           {k}
                         </text>
                       );
                     })}
                   </svg>
-                  <div className="radar-legend">
+                  <div className="z-radar-legend">
                     {Object.entries(sample.radarPcts).map(([k, v]) => (
-                      <div key={k} className="radar-attr">
-                        <span className="radar-attr-name">{k}</span>
-                        <span className="radar-attr-val">{v}%</span>
+                      <div key={k} className="z-radar-attr">
+                        <span className="z-radar-name">{k}</span>
+                        <span className="z-radar-val">{typeof v === "number" ? Math.round(v) : v}%</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* GENRES TAB */}
-              {resultsTab === "genres" && (
-                <div className="genres">
-                  {sample.genres.map(g => (
-                    <div key={g.n} className="genre-bar">
-                      <div className="genre-label">{g.n}</div>
-                      <div className="genre-bar-track">
-                        <div className="genre-bar-fill" style={{
-                          width: genreAnimated ? `${g.p}%` : "0",
-                          background: g.c,
-                          transition: "width 0.8s cubic-bezier(0.2,0.8,0.2,1)"
-                        }} />
+              {/* Neighbors */}
+              {dnaSubTab === "neighbors" && (
+                <div className="z-neighbors">
+                  {sample.neighbors.map((n, i) => (
+                    <div key={i} className="z-neighbor" onClick={() => playTrack(n.t, n.a)}>
+                      <div className="z-neighbor-rank">{String(i + 1).padStart(2, "0")}</div>
+                      <div className="z-neighbor-art">
+                        {getArt(n.t, n.a) ? <img src={getArt(n.t, n.a)} alt="" /> : <div className="z-art-placeholder-sm" />}
                       </div>
-                      <div className="genre-pct">{g.p}%</div>
+                      <div className="z-neighbor-info">
+                        <div className="z-neighbor-title">{n.t}</div>
+                        <div className="z-neighbor-artist">{n.a}</div>
+                      </div>
+                      <div className="z-neighbor-score">{n.p.toFixed(1)}%</div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* MARKET TAB */}
-              {resultsTab === "market" && (
-                <div className="market">
-                  <div className="market-grid">
-                    <div className="market-stat"><div className="market-stat-label">Hit Score</div><div className="market-stat-val">{sample.market.hit}%</div></div>
-                    <div className="market-stat"><div className="market-stat-label">Confidence</div><div className="market-stat-val">{sample.market.conf}</div></div>
-                    <div className="market-stat"><div className="market-stat-label">Core Demo</div><div className="market-stat-val">{sample.market.demo}</div></div>
-                    <div className="market-stat"><div className="market-stat-label">Reach</div><div className="market-stat-val">{sample.market.reach}</div></div>
+              {/* Genres */}
+              {dnaSubTab === "genres" && (
+                <div className="z-genres">
+                  {sample.genres.map(g => (
+                    <div key={g.n} className="z-genre-row">
+                      <div className="z-genre-name">{g.n}</div>
+                      <div className="z-genre-track">
+                        <div className="z-genre-fill" style={{ width: genreAnimated ? `${g.p}%` : "0", background: g.c, transition: "width 0.8s cubic-bezier(0.2,0.8,0.2,1)" }} />
+                      </div>
+                      <div className="z-genre-pct">{g.p}%</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Market */}
+              {dnaSubTab === "market" && (
+                <div className="z-market">
+                  <div className="z-market-grid">
+                    <div className="z-market-stat"><div className="z-market-label">Hit Score</div><div className="z-market-val">{sample.market.hit}%</div></div>
+                    <div className="z-market-stat"><div className="z-market-label">Confidence</div><div className="z-market-val">{sample.market.conf}</div></div>
+                    <div className="z-market-stat"><div className="z-market-label">Core Demo</div><div className="z-market-val">{sample.market.demo}</div></div>
+                    <div className="z-market-stat"><div className="z-market-label">Reach</div><div className="z-market-val">{sample.market.reach}</div></div>
                   </div>
-                  <div className="input-label" style={{ marginTop: 14 }}>&#x25B8; TOP CITIES</div>
+                  <div className="z-market-cities-label">TOP CITIES</div>
                   {sample.market.cities.map((c, i) => (
-                    <div key={c.n} className="market-city">
-                      <div className="market-city-rank">{i + 1}</div>
-                      <div className="market-city-name">{c.n}</div>
-                      <div className="market-city-num">{c.v}</div>
+                    <div key={c.n} className="z-market-city">
+                      <div className="z-market-city-rank">{i + 1}</div>
+                      <div className="z-market-city-name">{c.n}</div>
+                      <div className="z-market-city-val">{c.v}</div>
                     </div>
                   ))}
+
+                  {/* DSP Grid */}
+                  <div className="z-market-cities-label" style={{ marginTop: 28 }}>DEPLOYMENTS</div>
+                  <div className="z-dsp-grid">
+                    {[
+                      { name: "Apple Music", meta: "B2C affiliate -- revenue active", status: "live" },
+                      { name: "Tier-1 DSP", meta: "A/B pilot -- 2.4M cohort -- +18% session", status: "pilot" },
+                      { name: "Streaming Major", meta: "Technical eval scheduled Q2", status: "queue" },
+                      { name: "Tidal / YT Music / Amazon", meta: "Outbound in motion", status: "queue" },
+                    ].map(d => (
+                      <div key={d.name} className="z-dsp-card">
+                        <div className={`z-dsp-dot ${d.status}`} />
+                        <div className="z-dsp-info">
+                          <div className="z-dsp-name">{d.name}</div>
+                          <div className="z-dsp-meta">{d.meta}</div>
+                        </div>
+                        <div className={`z-dsp-tag ${d.status}`}>{d.status.toUpperCase()}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pricing */}
+                  <div className="z-market-cities-label" style={{ marginTop: 28 }}>LICENSING</div>
+                  <div className="z-pricing">
+                    <div className="z-price-card">
+                      <div className="z-price-tier">TIER 01</div>
+                      <div className="z-price-name">Pilot</div>
+                      <div className="z-price-amount">$25K<span>/mo</span></div>
+                      <div className="z-price-detail">90-day pilot &middot; 2M API calls</div>
+                      <button className="z-price-btn" onClick={() => window.location.href = "mailto:partnerships@zeeky.fm?subject=Pilot%20Inquiry"}>Start a Pilot</button>
+                    </div>
+                    <div className="z-price-card featured">
+                      <div className="z-price-tier">TIER 02</div>
+                      <div className="z-price-name">Production</div>
+                      <div className="z-price-amount">$200K<span>/yr+</span></div>
+                      <div className="z-price-detail">Base + usage above 50M queries</div>
+                      <button className="z-price-btn primary" onClick={() => window.location.href = "mailto:partnerships@zeeky.fm?subject=Production%20License"}>Talk to Sales</button>
+                    </div>
+                    <div className="z-price-card">
+                      <div className="z-price-tier">TIER 03</div>
+                      <div className="z-price-name">Exclusive</div>
+                      <div className="z-price-amount" style={{ fontSize: 22 }}>Custom</div>
+                      <div className="z-price-detail">8-figure floor &middot; multi-year</div>
+                      <button className="z-price-btn" onClick={() => window.location.href = "mailto:partnerships@zeeky.fm?subject=Exclusive%20Inquiry"}>Inquire Privately</button>
+                    </div>
+                  </div>
+
+                  {/* Exit strategy */}
+                  <div className="z-exit-quote">
+                    Non-exclusive licensing builds the customer base. Exclusive licensing builds the moat. Acquisition is the endgame.
+                  </div>
+                  <div className="z-exit-meta">ZEEKY ENTERTAINMENT INC. &middot; BUILT FOR ACQUISITION</div>
                 </div>
               )}
 
-              {/* JSON TAB */}
-              {resultsTab === "json" && (
-                <div className="json-pane">
-                  <pre>{`# POST /v1/dna/recommend · 200 OK · ${latency}ms\n{\n  "seed": "${sample.track} — ${sample.artist}",\n  "isrc": "${sample.isrc}",\n  "dna_score": ${(sample.score / 100).toFixed(3)},\n  "playlists_generated": 6,\n  "results": [\n${sample.neighbors.slice(0, 5).map(n => `    { "track": "${n.t}", "artist": "${n.a}", "score": ${(n.p / 100).toFixed(3)} }`).join(",\n")},\n    // + ${sample.neighbors.length - 5} more\n  ],\n  "latency_ms": ${latency},\n  "engine": "dna-v3.2"\n}`}</pre>
+              {/* JSON / API response */}
+              {dnaSubTab === "json" && (
+                <div className="z-json">
+                  <pre>{`# POST /v1/dna/recommend -- 200 OK -- ${latency}ms\n{\n  "seed": "${sample.track} -- ${sample.artist}",\n  "isrc": "${sample.isrc}",\n  "dna_score": ${(sample.score / 100).toFixed(3)},\n  "playlists_generated": 6,\n  "results": [\n${sample.neighbors.slice(0, 5).map(n => `    { "track": "${n.t}", "artist": "${n.a}", "score": ${(n.p / 100).toFixed(3)} }`).join(",\n")},\n    // + ${sample.neighbors.length - 5} more\n  ],\n  "latency_ms": ${latency},\n  "engine": "dna-v3.2"\n}`}</pre>
+                  <button className="z-copy-btn" onClick={() => {
+                    navigator.clipboard?.writeText(
+                      `curl https://api.zeeky.fm/v1/dna/recommend -H "Authorization: Bearer $ZEEKY_KEY" -d '{"seed_track":"isrc:${sample.isrc}","limit":25}'`
+                    ).then(() => showToast("API call copied"));
+                  }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+                    Copy cURL
+                  </button>
                 </div>
               )}
-
-              {/* RESULTS FOOTER */}
-              <div className="results-footer">
-                <button className="footer-btn apple" onClick={() => playTrack(sample.track, sample.artist)}>
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                  Play Preview
-                </button>
-                <button className="footer-btn api" onClick={() => {
-                  navigator.clipboard?.writeText(
-                    `curl https://api.zeeky.fm/v1/dna/recommend -H "Authorization: Bearer $ZEEKY_KEY" -d '{"seed_track":"isrc:${sample.isrc}","limit":25}'`
-                  ).then(() => showToast("API call copied"));
-                }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
-                  Copy API Call
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ENGINE SECTION */}
-        <section className="section" id="engine">
-          <div className="section-eyebrow">&#x25B8; THE ENGINE</div>
-          <h2 className="section-title">Tags are <em>subjective</em>.<br />DNA is <em>math</em>.</h2>
-          <p className="section-sub">DSPs rely on human-tagged metadata to decide what plays next. We extract 84 mathematical attributes from the audio file itself and project every song onto a unit sphere in Hilbert space. Recommendation becomes geometry.</p>
-          <div className="pillars">
-            <div className="pillar">
-              <div className="pillar-label">&#x25B8; INDEX</div>
-              <div className="pillar-h">100M songs, fingerprinted.</div>
-              <div className="pillar-p">Continuously expanding. Every song ranked by genre, tempo, mood, and Billboard correlation across 84 attributes.</div>
-            </div>
-            <div className="pillar">
-              <div className="pillar-label">&#x25B8; MATCH</div>
-              <div className="pillar-h">Proximity in 84-D space.</div>
-              <div className="pillar-p">Find the 25 nearest neighbors to any track in &lt;120ms. Distance is the angle between two vectors in Hilbert space.</div>
-            </div>
-            <div className="pillar">
-              <div className="pillar-label">&#x25B8; GENERATE</div>
-              <div className="pillar-h">6 playlists per seed.</div>
-              <div className="pillar-p">Pure DNA, Tempo, Mood, Genre Cross-Cut, Era Mix, and Curator Pick. Every seed generates six listenable playlists instantly.</div>
             </div>
           </div>
-        </section>
+        )}
 
-        {/* STATS TICKER */}
-        <div className="ticker">
-          <div className="ticker-stat"><div className="ticker-num">100M+</div><div className="ticker-desc">Indexed Songs</div></div>
-          <div className="ticker-stat"><div className="ticker-num">&lt;25ms</div><div className="ticker-desc">Indexed Recall</div></div>
-          <div className="ticker-stat"><div className="ticker-num">6</div><div className="ticker-desc">Playlists / Seed</div></div>
-          <div className="ticker-stat"><div className="ticker-num">99.97%</div><div className="ticker-desc">Uptime</div></div>
-        </div>
-
-        {/* DSP GRID */}
-        <section className="section">
-          <div className="section-eyebrow">&#x25B8; DEPLOYMENTS</div>
-          <h2 className="section-title">Built for the platforms<br />that <em>shape listening</em>.</h2>
-          <p className="section-sub">Non-exclusive licensing today. Exclusive acquisition tomorrow.</p>
-          <div className="dsp-grid">
-            {[
-              { name: "Apple Music", meta: "B2C affiliate · revenue active", status: "live" },
-              { name: "Tier-1 DSP", meta: "A/B pilot · 2.4M cohort · +18% session", status: "pilot" },
-              { name: "Streaming Major", meta: "Technical eval scheduled Q2", status: "queue" },
-              { name: "Tidal · YT Music · Amazon", meta: "Outbound in motion", status: "queue" },
-            ].map(d => (
-              <div key={d.name} className="dsp-card">
-                <div className={`dsp-status ${d.status}`} />
-                <div className="dsp-info">
-                  <div className="dsp-name">{d.name}</div>
-                  <div className="dsp-meta">{d.meta}</div>
-                </div>
-                <div className={`dsp-tag ${d.status}`}>{d.status.toUpperCase()}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* PRICING */}
-        <section className="section" id="pricing">
-          <div className="section-eyebrow">&#x25B8; LICENSING</div>
-          <h2 className="section-title">Three ways to<br /><em>plug us in</em>.</h2>
-          <p className="section-sub">Start non-exclusive. Scale to category-exclusive. End at acquisition.</p>
-          <div className="pricing-grid">
-            <div className="price-card">
-              <div className="price-tier">&#x25B8; TIER 01</div>
-              <div className="price-name">Pilot</div>
-              <div className="price-tagline">Test the engine. Prove the lift. Decide.</div>
-              <div className="price-amount">
-                <div className="price-num">$25K<span>/mo</span></div>
-                <div className="price-per">90-day pilot &middot; 2M API calls</div>
-              </div>
-              <ul className="price-features">
-                <li>1 environment</li>
-                <li>A/B dashboard</li>
-                <li>Slack support &middot; 24h SLA</li>
-              </ul>
-              <button className="price-cta" onClick={() => window.location.href = "mailto:partnerships@zeeky.fm?subject=Pilot%20Inquiry"}>Start a Pilot &rarr;</button>
+        {/* ━━━━━━━━━━━━━ MINI PLAYER ━━━━━━━━━━━━━ */}
+        {nowPlaying && (
+          <div className="z-mini-player">
+            <div className="z-mini-progress"><div className="z-mini-progress-fill" style={{ width: `${progress}%` }} /></div>
+            <div className="z-mini-art">
+              {getArt(nowPlaying.track, nowPlaying.artist)
+                ? <img src={getArt(nowPlaying.track, nowPlaying.artist)} alt="" />
+                : <div className="z-art-placeholder-xs" />
+              }
             </div>
-            <div className="price-card featured">
-              <div className="price-tier">&#x25B8; TIER 02</div>
-              <div className="price-name">Production</div>
-              <div className="price-tagline">Full deployment. Non-exclusive.</div>
-              <div className="price-amount">
-                <div className="price-num">$200K<span>/yr+</span></div>
-                <div className="price-per">Base + usage above 50M queries</div>
-              </div>
-              <ul className="price-features">
-                <li>Unlimited environments</li>
-                <li>SOC 2 Type II</li>
-                <li>Dedicated infra &middot; &lt;120ms P95</li>
-                <li>Co-marketing rights</li>
-                <li>Quarterly model retraining</li>
-              </ul>
-              <button className="price-cta" onClick={() => window.location.href = "mailto:partnerships@zeeky.fm?subject=Production%20License"}>Talk to Sales &rarr;</button>
+            <div className="z-mini-info">
+              <div className="z-mini-track">{nowPlaying.track}</div>
+              <div className="z-mini-artist">{nowPlaying.artist}</div>
             </div>
-            <div className="price-card">
-              <div className="price-tier">&#x25B8; TIER 03</div>
-              <div className="price-name">Exclusive</div>
-              <div className="price-tagline">Category lock. The final license before acquisition.</div>
-              <div className="price-amount">
-                <div className="price-num" style={{ fontSize: 24 }}>Custom</div>
-                <div className="price-per">8-figure floor &middot; multi-year</div>
-              </div>
-              <ul className="price-features">
-                <li>Category exclusivity</li>
-                <li>Patent licensing rights</li>
-                <li>Source code escrow</li>
-                <li>First right to acquire</li>
-              </ul>
-              <button className="price-cta" onClick={() => window.location.href = "mailto:partnerships@zeeky.fm?subject=Exclusive%20Inquiry"}>Inquire Privately &rarr;</button>
-            </div>
+            <button className="z-mini-btn" onClick={toggleAudio}>
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                {isPlaying ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M8 5v14l11-7z" />}
+              </svg>
+            </button>
+            <button className="z-mini-btn" onClick={() => playNextInQueue()}>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+            </button>
           </div>
-        </section>
+        )}
 
-        {/* EXIT QUOTE */}
-        <section className="section">
-          <div className="exit-quote">
-            Non-exclusive licensing builds the customer base.<br />
-            <em>Exclusive licensing</em> builds the moat.<br />
-            Acquisition is the <em>endgame</em>.
-          </div>
-          <div className="exit-meta">&#x25B8; ZEEKY ENTERTAINMENT INC. &middot; BUILT FOR ACQUISITION</div>
-        </section>
-
-        {/* FOOTER */}
-        <footer>
-          <div className="footer-meta">
-            &copy; 2026 ZEEKY ENTERTAINMENT INC.<br />
-            PATENTED HITLAB AI &middot; LICENSED GLOBALLY<br />
-            <span style={{ color: "var(--acid)" }}>&#x25CF;</span> API STATUS: OPERATIONAL
-          </div>
-        </footer>
-      </div>
-
-      {/* STICKY MINI PLAYER */}
-      {nowPlaying && (
-        <div className="mini-player">
-          <div className="mini-player-progress">
-            <div className="mini-player-progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="mini-player-art">
-            {getArt(nowPlaying.track, nowPlaying.artist)
-              ? <img src={getArt(nowPlaying.track, nowPlaying.artist)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 6 }} />
-              : <div className="art-placeholder-tiny" />
-            }
-          </div>
-          <div className="mini-player-info">
-            <div className="mini-player-track">{nowPlaying.track}</div>
-            <div className="mini-player-artist">{nowPlaying.artist}{queue.length > 1 && <span style={{ marginLeft: 6, fontSize: 9, color: "var(--blue-2)", fontFamily: "JetBrains Mono, monospace" }}>{queueIndex + 1}/{queue.length}</span>}</div>
-          </div>
-          {/* Skip back */}
-          <button className="mini-player-btn" onClick={() => { if (queueIndex > 0) { const prev = queue[queueIndex - 1]; setQueueIndex(queueIndex - 1); playTrack(prev.track, prev.artist); } }}>
-            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14 }}><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-          </button>
-          {/* Play/Pause */}
-          <button className="mini-player-btn" onClick={toggleAudio} style={{ width: 36, height: 36, background: "linear-gradient(135deg, var(--blue), var(--violet))" }}>
-            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16 }}>
-              {isPlaying ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M8 5v14l11-7z" />}
+        {/* ━━━━━━━━━━━━━ TAB BAR ━━━━━━━━━━━━━ */}
+        <div className="z-tab-bar">
+          <button className={`z-tab ${activeTab === "listen" ? "active" : ""}`} onClick={() => setActiveTab("listen")}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M3 12a9 9 0 1118 0 9 9 0 01-18 0z" fill={activeTab === "listen" ? "currentColor" : "none"} />
+              <path d="M8 5v14l11-7z" fill={activeTab === "listen" ? "#fff" : "none"} stroke={activeTab === "listen" ? "none" : "currentColor"} />
             </svg>
+            <span>Listen Now</span>
           </button>
-          {/* Skip forward */}
-          <button className="mini-player-btn" onClick={() => playNextInQueue()}>
-            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14 }}><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          <button className={`z-tab ${activeTab === "search" ? "active" : ""}`} onClick={() => setActiveTab("search")}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+            </svg>
+            <span>Search</span>
+          </button>
+          <button className={`z-tab ${activeTab === "library" ? "active" : ""}`} onClick={() => setActiveTab("library")}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="7" height="7" rx="1" fill={activeTab === "library" ? "currentColor" : "none"} />
+              <rect x="14" y="3" width="7" height="7" rx="1" fill={activeTab === "library" ? "currentColor" : "none"} />
+              <rect x="3" y="14" width="7" height="7" rx="1" fill={activeTab === "library" ? "currentColor" : "none"} />
+              <rect x="14" y="14" width="7" height="7" rx="1" fill={activeTab === "library" ? "currentColor" : "none"} />
+            </svg>
+            <span>Library</span>
+          </button>
+          <button className={`z-tab ${activeTab === "dna" ? "active" : ""}`} onClick={() => setActiveTab("dna")}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M6 3c0 4 6 5 6 9s-6 5-6 9" />
+              <path d="M18 3c0 4-6 5-6 9s6 5 6 9" />
+              <line x1="8" y1="7" x2="16" y2="7" />
+              <line x1="8" y1="12" x2="16" y2="12" />
+              <line x1="8" y1="17" x2="16" y2="17" />
+            </svg>
+            <span>DNA</span>
           </button>
         </div>
-      )}
-
-      {/* BOTTOM TAB BAR */}
-      <div className="tab-bar">
-        {/* TAB 1: ANALYZE — the core product action */}
-        <button className={`tab-btn ${activeTab === "demo" ? "active" : ""}`} onClick={() => { setActiveTab("demo"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-          <svg viewBox="0 0 24 24" fill={activeTab==="demo"?"currentColor":"none"} stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" strokeLinecap="round"/></svg>
-          <span>Analyze</span>
-        </button>
-
-        {/* TAB 2: LISTEN — plays the full queue back to back */}
-        <button className={`tab-btn ${activeTab === "listen" ? "active" : ""}`} onClick={() => { setActiveTab("listen"); startPlaylist(); }}>
-          <svg viewBox="0 0 24 24" fill={activeTab==="listen"?"currentColor":"none"} stroke="currentColor" strokeWidth="1.5"><polygon points="5,3 19,12 5,21" fill={activeTab==="listen"?"currentColor":"none"}/></svg>
-          <span>Listen</span>
-          {queue.length > 0 && <span className="tab-badge">{queue.length}</span>}
-        </button>
-
-        {/* TAB 3: PLAYLISTS — the headline feature, 6 per seed */}
-        <button className={`tab-btn ${activeTab === "playlists" ? "active" : ""}`} onClick={() => { setActiveTab("playlists"); setResultsTab("playlists"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" rx="1.5" fill={activeTab==="playlists"?"currentColor":"none"}/><rect x="14" y="3" width="7" height="7" rx="1.5" fill={activeTab==="playlists"?"currentColor":"none"}/><rect x="3" y="14" width="7" height="7" rx="1.5" fill={activeTab==="playlists"?"currentColor":"none"}/><rect x="14" y="14" width="7" height="7" rx="1.5" fill={activeTab==="playlists"?"currentColor":"none"}/></svg>
-          <span>Playlists</span>
-          <span className="tab-badge">6</span>
-        </button>
-
-        {/* TAB 4: DNA — the tech showcase */}
-        <button className={`tab-btn ${activeTab === "dna" ? "active" : ""}`} onClick={() => { setActiveTab("dna"); setResultsTab("radar"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 3c0 4 6 5 6 9s-6 5-6 9"/><path d="M18 3c0 4-6 5-6 9s6 5 6 9"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
-          <span>DNA</span>
-        </button>
-
-        {/* TAB 5: LICENSE — the conversion action for DSPs */}
-        <button className={`tab-btn ${activeTab === "license" ? "active" : ""}`} onClick={() => { setActiveTab("license"); document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" }); }}>
-          <svg viewBox="0 0 24 24" fill={activeTab==="license"?"currentColor":"none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>License</span>
-        </button>
       </div>
 
       {/* TOAST */}
-      <div className={`toast ${toast ? "show" : ""}`}>
+      <div className={`z-toast ${toast ? "show" : ""}`}>
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
         <span>{toast}</span>
       </div>
@@ -1185,305 +1212,491 @@ export default function ZeekyPage() {
 const CSS = `
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:#ffffff;color:#1d1d1f;overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;line-height:1.5}
+body{font-family:-apple-system,'SF Pro Display','SF Pro Text','Inter','Helvetica Neue',sans-serif;background:#ffffff;color:#1d1d1f;overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;line-height:1.47}
 button{font-family:inherit;background:none;border:none;color:inherit;cursor:pointer;outline:none}
-input,select,textarea{font-family:inherit;outline:none}
+input{font-family:inherit;outline:none;border:none;background:transparent}
 a{color:inherit;text-decoration:none}
 
 :root{
-  --bg:#ffffff;--bg-2:#f5f5f7;
-  --blue:#0071e3;--blue-2:#0077ED;--blue-glow:rgba(0,113,227,0.3);
-  --violet:#bf5af2;
-  --apple:#fa233b;
-  --acid:#34c759;
-  --gold:#ff9f0a;
-  --line:rgba(0,0,0,0.08);--line-2:rgba(0,0,0,0.12);
-  --muted:rgba(0,0,0,0.5);
+  --bg:#ffffff;
+  --bg-2:#f5f5f7;
+  --accent:#fa233b;
+  --blue:#0071e3;
+  --green:#34c759;
+  --text:#1d1d1f;
+  --text-2:#86868b;
+  --text-3:#aeaeb2;
+  --sep:rgba(60,60,67,0.12);
+  --card-shadow:0 2px 12px rgba(0,0,0,0.08);
+  --card-shadow-lg:0 4px 24px rgba(0,0,0,0.1);
 }
 
 /* ─── APP SHELL ─── */
-.app{min-height:100vh;min-height:100dvh;background:radial-gradient(ellipse 80% 40% at 20% 0%,rgba(0,113,227,0.04),transparent 60%),radial-gradient(ellipse 70% 50% at 80% 100%,rgba(191,90,242,0.03),transparent 70%),#ffffff;overflow-x:hidden}
+.z-app{
+  min-height:100vh;min-height:100dvh;
+  background:#ffffff;
+  max-width:520px;margin:0 auto;
+  position:relative;
+  padding-bottom:120px;
+}
+@media(min-width:720px){
+  .z-app{box-shadow:0 0 60px rgba(0,0,0,0.04);border-left:1px solid var(--sep);border-right:1px solid var(--sep)}
+}
+
+.z-screen{min-height:calc(100vh - 80px)}
 
 /* ─── TOPBAR ─── */
-.topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,0.85);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.brand{display:flex;align-items:center;gap:8px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px}
-.brand-mark{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:#1d1d1f;border-radius:5px}
-.brand-mark span{font-family:'Bebas Neue',sans-serif;color:#fff;font-size:18px;line-height:1;transform:skewX(-10deg);margin-top:-1px}
-.status-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;background:rgba(52,199,89,0.1);border:1px solid rgba(52,199,89,0.3);border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--acid);letter-spacing:0.8px;font-weight:600;text-transform:uppercase;white-space:nowrap}
-.status-pill .dot{width:5px;height:5px;border-radius:50%;background:var(--acid);box-shadow:0 0 8px var(--acid);animation:pulse 1.6s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.4)}}
-.menu-btn{width:32px;height:32px;border-radius:8px;background:rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:center}
-.menu-btn:active{transform:scale(0.94)}
-.menu-btn svg{width:14px;height:14px}
+.z-topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(255,255,255,0.88);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  padding:16px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.z-logo{
+  font-size:20px;font-weight:800;letter-spacing:1.5px;color:var(--text);
+}
+.z-status-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px var(--green);
+  animation:z-pulse 2s ease-in-out infinite;
+}
+@keyframes z-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.3)}}
 
-/* ─── HERO ─── */
-.hero{padding:36px 18px 28px;position:relative}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;background:rgba(0,113,227,0.08);border:1px solid rgba(0,113,227,0.2);border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--blue-2);letter-spacing:1px;font-weight:600;margin-bottom:22px}
-.hero-eyebrow .dot{width:5px;height:5px;border-radius:50%;background:var(--blue-2);box-shadow:0 0 6px var(--blue-2);animation:pulse 1.6s ease-in-out infinite}
-.hero h1{font-size:38px;font-weight:800;letter-spacing:-1.5px;line-height:1;margin-bottom:18px}
-.hero h1 em{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;color:var(--blue-2);letter-spacing:-0.5px}
-.hero-sub{font-size:15px;color:rgba(0,0,0,0.55);line-height:1.5;margin-bottom:24px}
+.z-topbar-title{
+  font-size:28px;font-weight:800;letter-spacing:-0.8px;
+}
 
-/* ─── AUDIENCE TOGGLE ─── */
-.audience-toggle{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;background:rgba(0,0,0,0.03);border:1px solid var(--line);border-radius:14px;margin-bottom:20px}
-.audience-btn{padding:11px 8px;border-radius:10px;font-size:13px;font-weight:600;color:var(--muted);transition:all 0.2s ease;display:flex;flex-direction:column;align-items:center;gap:2px}
-.audience-btn .micro{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.8px;opacity:0.7}
-.audience-btn.active{background:rgba(0,113,227,0.1);color:#1d1d1f;box-shadow:0 1px 0 rgba(0,0,0,0.03) inset}
-.audience-btn.active.b2c{background:rgba(191,90,242,0.1)}
+/* ─── SEARCH ─── */
+.z-listen-hero{padding:8px 20px 0}
+.z-search-fullscreen{padding:8px 20px 0}
 
-/* ─── DEMO CARD ─── */
-.demo-card{margin:0 18px 32px;border:1px solid rgba(0,0,0,0.08);border-radius:18px;overflow:hidden;background:#ffffff;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
-.demo-header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(0,0,0,0.02)}
-.demo-tag{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--blue-2);letter-spacing:1.2px;font-weight:600;text-transform:uppercase}
-.demo-tag .dot{width:5px;height:5px;border-radius:50%;background:var(--acid);box-shadow:0 0 8px var(--acid);animation:pulse 1.6s ease-in-out infinite}
-.demo-meta{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.8px}
+.z-search-wrap{position:relative;margin-bottom:20px}
+.z-search-large .z-search-bar{padding:14px 18px}
+.z-search-bar{
+  display:flex;align-items:center;gap:10px;
+  background:var(--bg-2);
+  border-radius:12px;
+  padding:12px 16px;
+  transition:box-shadow 0.2s;
+}
+.z-search-bar:focus-within{box-shadow:0 0 0 3px rgba(0,113,227,0.2)}
+.z-search-icon{width:18px;height:18px;color:var(--text-2);flex-shrink:0}
+.z-search-bar input{
+  flex:1;font-size:16px;color:var(--text);min-width:0;
+}
+.z-search-bar input::placeholder{color:var(--text-3);font-weight:400}
+.z-search-clear{width:20px;height:20px;color:var(--text-3);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.z-search-clear svg{width:18px;height:18px}
 
-/* ─── INPUT ZONE ─── */
-.input-zone{padding:18px}
-.input-label{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1.2px;font-weight:600;text-transform:uppercase;margin-bottom:8px}
-.input-row{display:flex;gap:8px;background:#f5f5f7;border:1px solid var(--line-2);border-radius:12px;padding:4px 4px 4px 12px;transition:border-color 0.2s ease}
-.input-row:focus-within{border-color:var(--blue)}
-.input-row input{flex:1;background:transparent;border:none;color:#1d1d1f;font-size:14px;padding:10px 0;min-width:0}
-.input-row input::placeholder{color:rgba(0,0,0,0.35)}
-.analyze-btn{padding:0 16px;background:linear-gradient(135deg,#0071e3,#0077ED);border-radius:9px;font-size:13px;font-weight:700;letter-spacing:-0.1px;color:#fff;display:flex;align-items:center;gap:6px;flex-shrink:0;transition:transform 0.15s ease}
-.analyze-btn:active{transform:scale(0.96)}
-.analyze-btn svg{width:12px;height:12px}
+.z-search-dropdown{
+  position:absolute;top:100%;left:0;right:0;margin-top:4px;
+  background:#ffffff;border-radius:12px;overflow:hidden;z-index:100;
+  box-shadow:var(--card-shadow-lg);border:1px solid var(--sep);
+}
+.z-search-msg{padding:16px;text-align:center;font-size:13px;color:var(--text-3)}
+.z-search-result{
+  display:flex;align-items:center;gap:12px;width:100%;padding:10px 16px;
+  border-bottom:1px solid rgba(60,60,67,0.06);transition:background 0.1s;
+}
+.z-search-result:hover{background:var(--bg-2)}
+.z-search-result:last-child{border-bottom:none}
+.z-search-result-icon{
+  width:36px;height:36px;border-radius:8px;background:var(--bg-2);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.z-search-result-icon svg{width:16px;height:16px;color:var(--text-3)}
+.z-search-result-text{flex:1;min-width:0}
+.z-search-result-title{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-search-result-artist{font-size:12px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-search-result-arrow{width:16px;height:16px;color:var(--text-3);flex-shrink:0}
 
-/* ─── SAMPLE CHIPS ─── */
-.samples{margin-top:14px;display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
-.samples::-webkit-scrollbar{display:none}
-.sample-chip{flex-shrink:0;padding:6px 12px;background:#f5f5f7;border:1px solid var(--line);border-radius:100px;font-size:11px;font-weight:500;color:rgba(0,0,0,0.65);display:flex;align-items:center;gap:6px;transition:all 0.15s ease;white-space:nowrap}
-.sample-chip:active{transform:scale(0.96)}
-.sample-chip.active{background:rgba(0,113,227,0.08);border-color:rgba(0,113,227,0.3);color:#1d1d1f}
-.sample-chip.indexed{border-color:rgba(52,199,89,0.3)}
-.sample-chip.indexed.active{border-color:rgba(52,199,89,0.5);background:rgba(52,199,89,0.08)}
-.indexed-dot{width:5px;height:5px;border-radius:50%;background:var(--acid);box-shadow:0 0 6px var(--acid);flex-shrink:0}
+/* ─── CHIPS ─── */
+.z-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.z-chip{
+  padding:8px 16px;background:var(--bg-2);border-radius:100px;
+  font-size:13px;font-weight:500;color:var(--text-2);
+  display:flex;align-items:center;gap:6px;transition:all 0.15s;
+}
+.z-chip:active{transform:scale(0.96)}
+.z-chip.active{background:rgba(250,35,59,0.08);color:var(--accent)}
+.z-chip-dot{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
 
 /* ─── INDEXED FLASH ─── */
-.indexed-flash{padding:28px 20px;text-align:center;border-top:1px solid var(--line);background:rgba(52,199,89,0.08);animation:flashIn 0.4s ease}
-.indexed-flash-text{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acid);letter-spacing:1.4px;font-weight:700;text-transform:uppercase}
-@keyframes flashIn{0%{background:rgba(52,199,89,0.2)}100%{background:rgba(52,199,89,0.08)}}
+.z-indexed-flash{
+  margin:0 20px 16px;padding:20px;text-align:center;
+  background:rgba(52,199,89,0.06);border-radius:12px;
+  font-family:-apple-system,'SF Mono','JetBrains Mono',monospace;
+  font-size:12px;color:var(--green);letter-spacing:1.4px;font-weight:700;
+  animation:z-flash 0.4s ease;
+}
+@keyframes z-flash{0%{background:rgba(52,199,89,0.15)}100%{background:rgba(52,199,89,0.06)}}
 
 /* ─── ANALYZING ─── */
-.analyzing{padding:28px 20px;text-align:center;border-top:1px solid var(--line)}
-.analyzing-bars{display:flex;gap:3px;justify-content:center;height:32px;align-items:end;margin-bottom:14px}
-.analyzing-bar{width:4px;background:linear-gradient(180deg,var(--blue),var(--violet));border-radius:2px;animation:barPulse 1.2s ease-in-out infinite}
-@keyframes barPulse{0%,100%{height:8px;opacity:0.4}50%{height:32px;opacity:1}}
-.analyzing-text{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue-2);letter-spacing:1px;margin-bottom:4px}
-.analyzing-step{font-size:11px;color:var(--muted)}
+.z-analyzing{padding:40px 20px;text-align:center}
+.z-analyzing-bars{display:flex;gap:4px;justify-content:center;height:36px;align-items:end;margin-bottom:16px}
+.z-analyzing-bar{width:4px;background:var(--accent);border-radius:2px;animation:z-bar 1.2s ease-in-out infinite}
+@keyframes z-bar{0%,100%{height:8px;opacity:0.3}50%{height:36px;opacity:1}}
+.z-analyzing-label{font-family:-apple-system,'SF Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1.2px;font-weight:600;margin-bottom:6px}
+.z-analyzing-step{font-size:13px;color:var(--text-2)}
 
 /* ─── RESULTS ─── */
-.results{border-top:1px solid var(--line)}
-.results-header{padding:18px 18px 14px;display:flex;align-items:center;gap:12px}
-.results-art{width:56px;height:56px;border-radius:8px;overflow:hidden;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,0.4)}
-.results-meta{flex:1;min-width:0}
-.results-track{font-size:16px;font-weight:700;letter-spacing:-0.3px;margin-bottom:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.results-artist{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px}
-.results-isrc{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:4px;text-transform:uppercase}
-.results-isrc.indexed{background:rgba(52,199,89,0.1);color:var(--acid);border:1px solid rgba(52,199,89,0.25)}
-.results-isrc.new{background:rgba(255,159,10,0.1);color:var(--gold);border:1px solid rgba(255,159,10,0.25)}
-.results-score{text-align:right;flex-shrink:0}
-.results-score-num{font-size:24px;font-weight:800;letter-spacing:-1px;color:var(--blue-2);font-variant-numeric:tabular-nums;line-height:1}
-.results-score-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-top:2px}
+.z-results{padding:0 20px}
 
-/* ─── RESULTS TABS ─── */
-.results-tabs{display:flex;padding:0 18px;gap:14px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
-.results-tabs::-webkit-scrollbar{display:none}
-.results-tab{padding:10px 0 12px;font-size:12px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;transition:all 0.2s ease;flex-shrink:0;position:relative;top:1px;display:flex;align-items:center;gap:5px}
-.results-tab.active{color:#1d1d1f;border-bottom-color:var(--blue)}
-.badge{font-family:'JetBrains Mono',monospace;font-size:9px;background:rgba(0,113,227,0.1);color:var(--blue-2);padding:1px 5px;border-radius:4px;font-weight:700}
+/* Song header */
+.z-song-header{display:flex;align-items:center;gap:14px;margin-bottom:24px;padding:16px;background:#fff;border-radius:16px;box-shadow:var(--card-shadow)}
+.z-song-art{width:60px;height:60px;border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 4px 16px rgba(0,0,0,0.15)}
+.z-song-art img{width:100%;height:100%;object-fit:cover}
+.z-song-meta{flex:1;min-width:0}
+.z-song-title{font-size:16px;font-weight:700;letter-spacing:-0.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-song-artist{font-size:13px;color:var(--text-2);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-song-badges{display:flex;gap:6px;flex-wrap:wrap}
+.z-badge{
+  font-family:-apple-system,'SF Mono','JetBrains Mono',monospace;
+  font-size:9px;font-weight:700;letter-spacing:0.8px;padding:2px 7px;border-radius:4px;
+}
+.z-badge.indexed{background:rgba(52,199,89,0.1);color:var(--green)}
+.z-badge.new{background:rgba(255,159,10,0.1);color:#ff9f0a}
+.z-badge.score{background:rgba(250,35,59,0.08);color:var(--accent)}
+.z-badge.latency{background:var(--bg-2);color:var(--text-2)}
 
-/* ─── PLAYLISTS ─── */
-.playlists-container{padding:10px 14px 14px}
-.playlist-card{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:10px;background:#ffffff;transition:border-color 0.2s}
-.playlist-card.expanded{border-color:rgba(0,113,227,0.3)}
-.playlist-head{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;transition:background 0.15s}
-.playlist-head:hover{background:rgba(0,0,0,0.02)}
-.playlist-cover{width:48px;height:48px;border-radius:8px;overflow:hidden;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:rgba(0,0,0,0.06)}
-.playlist-cover-cell{overflow:hidden}
-.playlist-info{flex:1;min-width:0}
-.playlist-tag{font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;letter-spacing:1px;padding:2px 6px;border-radius:3px;border:1px solid;display:inline-block;margin-bottom:3px;text-transform:uppercase}
-.playlist-name{font-size:13px;font-weight:700;letter-spacing:-0.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.playlist-sub{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:0.3px}
-.playlist-chevron{font-size:10px;color:var(--muted);flex-shrink:0;width:20px;text-align:center}
-.playlist-body{border-top:1px solid var(--line);background:rgba(0,0,0,0.02)}
-.playlist-tracks{max-height:300px;overflow-y:auto;scrollbar-width:none}
-.playlist-tracks::-webkit-scrollbar{display:none}
-.pl-track{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:0.5px solid rgba(84,84,88,0.2);cursor:pointer;transition:background 0.1s}
-.pl-track:hover{background:rgba(0,0,0,0.03)}
-.pl-track:last-child{border-bottom:none}
-.pl-track-num{width:18px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-align:right;flex-shrink:0}
-.pl-track-art{width:32px;height:32px;border-radius:4px;overflow:hidden;flex-shrink:0}
-.pl-track-info{flex:1;min-width:0}
-.pl-track-title{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pl-track-artist{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pl-track-play{width:26px;height:26px;background:linear-gradient(135deg,var(--blue),var(--violet));border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;transition:transform 0.15s}
-.pl-track-play:active{transform:scale(0.9)}
-.pl-track-play svg{width:12px;height:12px}
-.playlist-actions{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
-.playlist-action-btn{flex:1;padding:9px;border-radius:8px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform 0.15s}
-.playlist-action-btn:active{transform:scale(0.97)}
-.apple-btn{background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;box-shadow:0 3px 10px rgba(0,113,227,0.2)}
-.export-btn{background:rgba(0,113,227,0.08);border:1px solid rgba(0,113,227,0.2);color:var(--blue-2)}
+.z-play-hero{
+  width:44px;height:44px;border-radius:50%;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 4px 12px rgba(250,35,59,0.3);
+  transition:transform 0.15s;
+}
+.z-play-hero:active{transform:scale(0.92)}
+.z-play-hero svg{width:18px;height:18px;margin-left:2px}
 
-/* ─── NEIGHBORS ─── */
-.neighbors{padding:6px 0 14px}
-.neighbor{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:0.5px solid rgba(84,84,88,0.3)}
-.neighbor:last-child{border-bottom:none}
-.neighbor-rank{width:18px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:right;flex-shrink:0;font-weight:500}
-.neighbor-art{width:38px;height:38px;border-radius:5px;overflow:hidden;flex-shrink:0}
-.neighbor-info{flex:1;min-width:0}
-.neighbor-title{font-size:13px;font-weight:600;letter-spacing:-0.1px;margin-bottom:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.neighbor-artist{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.neighbor-bar{width:32px;height:3px;background:rgba(0,0,0,0.08);border-radius:2px;overflow:hidden;flex-shrink:0}
-.neighbor-bar-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--violet))}
-.neighbor-pct{font-family:'JetBrains Mono',monospace;font-size:11px;color:#1d1d1f;font-weight:600;width:38px;text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums}
-.neighbor-apple{width:30px;height:30px;background:linear-gradient(135deg,var(--blue),var(--blue-2));border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;box-shadow:0 2px 6px rgba(0,113,227,0.2);transition:transform 0.15s ease}
-.neighbor-apple:active{transform:scale(0.92)}
-.neighbor-apple svg{width:13px;height:13px}
+/* ─── PLAYLIST CARDS ─── */
+.z-playlists-grid{display:flex;flex-direction:column;gap:10px;padding-bottom:20px}
 
-/* ─── RADAR ─── */
-.radar-wrap{padding:14px}
-.radar-svg{width:100%;height:auto;display:block}
-.radar-legend{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 6px 8px;margin-top:6px}
-.radar-attr{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;padding:5px 8px;background:rgba(0,0,0,0.03);border-radius:6px}
-.radar-attr-name{color:var(--muted);letter-spacing:0.5px}
-.radar-attr-val{color:var(--blue-2);font-weight:600}
+.z-playlist-card{
+  background:#ffffff;border-radius:14px;overflow:hidden;
+  box-shadow:var(--card-shadow);
+  transition:box-shadow 0.2s;
+}
+.z-playlist-card.expanded{box-shadow:var(--card-shadow-lg)}
+.z-playlist-header{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer}
+.z-playlist-header:active{background:var(--bg-2)}
+.z-playlist-mosaic{
+  width:52px;height:52px;border-radius:10px;overflow:hidden;flex-shrink:0;
+  display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;
+  background:rgba(0,0,0,0.06);
+}
+.z-mosaic-cell{overflow:hidden}
+.z-mosaic-cell img{width:100%;height:100%;object-fit:cover}
+.z-playlist-info{flex:1;min-width:0}
+.z-playlist-tag{font-family:-apple-system,'SF Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.8px;margin-bottom:2px}
+.z-playlist-name{font-size:14px;font-weight:700;letter-spacing:-0.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-playlist-sub{font-size:11px;color:var(--text-2)}
+.z-playlist-play{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(250,35,59,0.25);transition:transform 0.15s;
+}
+.z-playlist-play:active{transform:scale(0.9)}
+.z-playlist-play svg{width:14px;height:14px;margin-left:1px}
 
-/* ─── GENRES ─── */
-.genres{padding:14px 18px}
-.genre-bar{display:grid;grid-template-columns:90px 1fr 44px;gap:10px;align-items:center;margin-bottom:10px}
-.genre-bar:last-child{margin-bottom:0}
-.genre-label{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.genre-bar-track{height:6px;background:rgba(0,0,0,0.06);border-radius:3px;overflow:hidden}
-.genre-bar-fill{height:100%;border-radius:3px}
-.genre-pct{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#1d1d1f;text-align:right;font-variant-numeric:tabular-nums}
-
-/* ─── MARKET ─── */
-.market{padding:14px 18px}
-.market-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.market-stat{background:rgba(0,0,0,0.02);border:0.5px solid var(--line);border-radius:10px;padding:10px 12px}
-.market-stat-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.8px;margin-bottom:4px;text-transform:uppercase}
-.market-stat-val{font-size:18px;font-weight:700;letter-spacing:-0.4px;font-variant-numeric:tabular-nums}
-.market-city{display:grid;grid-template-columns:14px 1fr 50px;gap:8px;align-items:center;padding:7px 0;border-bottom:0.5px solid rgba(84,84,88,0.2);font-size:12px}
-.market-city:last-child{border-bottom:none}
-.market-city-rank{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted)}
-.market-city-name{font-weight:500}
-.market-city-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue-2);text-align:right;font-weight:600}
-
-/* ─── JSON ─── */
-.json-pane{padding:14px 18px}
-.json-pane pre{background:#f5f5f7;border:1px solid var(--line);border-radius:10px;padding:14px;color:rgba(0,0,0,0.7);overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
-
-/* ─── RESULTS FOOTER ─── */
-.results-footer{padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:8px;background:rgba(0,0,0,0.02)}
-.footer-btn{flex:1;padding:11px;border-radius:10px;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform 0.15s ease}
-.footer-btn:active{transform:scale(0.97)}
-.footer-btn.apple{background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;box-shadow:0 4px 12px rgba(0,113,227,0.2)}
-.footer-btn.api{background:rgba(0,113,227,0.08);border:1px solid rgba(0,113,227,0.2);color:var(--blue-2)}
-.footer-btn svg{width:13px;height:13px;flex-shrink:0}
+/* Playlist body / track list */
+.z-playlist-body{border-top:1px solid var(--sep);max-height:360px;overflow-y:auto;scrollbar-width:none}
+.z-playlist-body::-webkit-scrollbar{display:none}
+.z-pl-track{
+  display:flex;align-items:center;gap:10px;padding:8px 16px;
+  border-bottom:1px solid rgba(60,60,67,0.06);cursor:pointer;transition:background 0.1s;
+}
+.z-pl-track:hover{background:var(--bg-2)}
+.z-pl-track:last-child{border-bottom:none}
+.z-pl-num{width:20px;font-family:-apple-system,'SF Mono',monospace;font-size:10px;color:var(--text-3);text-align:right;flex-shrink:0}
+.z-pl-art{width:34px;height:34px;border-radius:6px;overflow:hidden;flex-shrink:0}
+.z-pl-art img{width:100%;height:100%;object-fit:cover}
+.z-pl-info{flex:1;min-width:0}
+.z-pl-title{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-pl-artist{font-size:11px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-pl-play-btn{
+  width:28px;height:28px;border-radius:50%;
+  background:var(--bg-2);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.15s;
+}
+.z-pl-play-btn:active{transform:scale(0.9)}
+.z-pl-play-btn svg{width:12px;height:12px;margin-left:1px}
 
 /* ─── ART PLACEHOLDERS ─── */
-.art-placeholder{width:100%;height:100%;background:linear-gradient(135deg,#e8e8ed,#d2d2d7);border-radius:8px}
-.art-placeholder-small{width:100%;height:100%;background:linear-gradient(135deg,#e8e8ed,#ddd2e8);border-radius:4px}
-.art-placeholder-tiny{width:100%;height:100%;background:linear-gradient(135deg,#e8e8ed,#d8d2e8);border-radius:3px}
+.z-art-placeholder{width:100%;height:100%;background:linear-gradient(135deg,#e8e8ed,#d2d2d7);border-radius:inherit}
+.z-art-placeholder-sm{width:100%;height:100%;background:linear-gradient(135deg,#f0f0f5,#e5e5ea);border-radius:4px}
+.z-art-placeholder-xs{width:100%;height:100%;background:linear-gradient(135deg,#f0f0f5,#e8e8ed);border-radius:3px}
 
-/* ─── SECTION ─── */
-.section{padding:48px 18px;border-top:1px solid var(--line)}
-.section-eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--blue-2);letter-spacing:1.4px;font-weight:600;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.section-eyebrow::before{content:'';width:14px;height:1px;background:var(--blue-2)}
-.section-title{font-size:30px;font-weight:800;letter-spacing:-1.2px;line-height:1.05;margin-bottom:14px}
-.section-title em{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;color:var(--blue-2)}
-.section-sub{font-size:14px;color:rgba(0,0,0,0.5);line-height:1.5;margin-bottom:24px}
+/* ─── TRENDING (Search tab) ─── */
+.z-section-label{
+  font-size:20px;font-weight:700;letter-spacing:-0.4px;margin-bottom:16px;color:var(--text);
+}
+.z-trending-section{margin-top:8px}
+.z-trending-cards{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+}
+.z-trending-card{
+  border-radius:12px;overflow:hidden;background:#fff;
+  box-shadow:var(--card-shadow);transition:transform 0.15s;text-align:left;
+}
+.z-trending-card:active{transform:scale(0.97)}
+.z-trending-art{aspect-ratio:1;overflow:hidden}
+.z-trending-art img{width:100%;height:100%;object-fit:cover}
+.z-trending-title{font-size:13px;font-weight:700;padding:10px 12px 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-trending-artist{font-size:11px;color:var(--text-2);padding:0 12px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ─── PILLARS ─── */
-.pillars{display:grid;gap:10px}
-.pillar{padding:18px;background:rgba(0,0,0,0.02);border:1px solid var(--line);border-radius:14px}
-.pillar-label{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--blue-2);letter-spacing:1.2px;font-weight:600;margin-bottom:10px}
-.pillar-h{font-size:16px;font-weight:700;letter-spacing:-0.2px;margin-bottom:6px}
-.pillar-p{font-size:13px;color:rgba(0,0,0,0.5);line-height:1.5}
+.z-sample-results{margin-top:12px}
+.z-sample-result-row{
+  display:flex;align-items:center;gap:12px;width:100%;padding:10px 0;
+  border-bottom:1px solid var(--sep);
+}
+.z-sample-result-art{width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0}
+.z-sample-result-art img{width:100%;height:100%;object-fit:cover}
+.z-sample-result-info{flex:1;min-width:0;text-align:left}
+.z-sample-result-title{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-sample-result-artist{font-size:12px;color:var(--text-2)}
 
-/* ─── TICKER ─── */
-.ticker{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:0 18px 32px;margin-top:-16px}
-.ticker-stat{padding:10px 12px;background:rgba(0,0,0,0.02);border:1px solid var(--line);border-radius:10px}
-.ticker-num{font-size:18px;font-weight:800;letter-spacing:-0.5px;font-variant-numeric:tabular-nums;line-height:1.1}
-.ticker-desc{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-top:3px}
+/* ─── LIBRARY ─── */
+.z-library{padding:8px 20px 20px}
+.z-library-seed{
+  display:flex;align-items:center;gap:14px;padding:14px 16px;
+  background:#fff;border-radius:14px;box-shadow:var(--card-shadow);margin-bottom:20px;
+}
+.z-library-seed-art{width:48px;height:48px;border-radius:10px;overflow:hidden;flex-shrink:0}
+.z-library-seed-art img{width:100%;height:100%;object-fit:cover}
+.z-library-seed-title{font-size:15px;font-weight:700;letter-spacing:-0.2px}
+.z-library-seed-artist{font-size:12px;color:var(--text-2)}
 
-/* ─── DSP GRID ─── */
-.dsp-grid{display:grid;gap:8px}
-.dsp-card{padding:14px 16px;background:rgba(0,0,0,0.02);border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;gap:12px}
-.dsp-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.dsp-status.live{background:var(--acid);box-shadow:0 0 8px var(--acid);animation:pulse 1.6s ease-in-out infinite}
-.dsp-status.pilot{background:#ffaa3a;box-shadow:0 0 8px rgba(255,170,58,0.6)}
-.dsp-status.queue{background:rgba(0,0,0,0.2)}
-.dsp-info{flex:1;min-width:0}
-.dsp-name{font-size:14px;font-weight:700;letter-spacing:-0.2px}
-.dsp-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.5px;margin-top:2px}
-.dsp-tag{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.8px;flex-shrink:0;padding:4px 8px;border-radius:4px}
-.dsp-tag.live{background:rgba(52,199,89,0.1);color:var(--acid)}
-.dsp-tag.pilot{background:rgba(255,170,58,0.1);color:#cc7700}
-.dsp-tag.queue{background:rgba(0,0,0,0.04);color:var(--muted)}
+.z-library-playlist{background:#fff;border-radius:14px;box-shadow:var(--card-shadow);margin-bottom:10px;overflow:hidden}
+.z-library-playlist.expanded{box-shadow:var(--card-shadow-lg)}
+.z-library-pl-header{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}
+.z-library-pl-header:active{background:var(--bg-2)}
+.z-library-pl-mosaic{width:48px;height:48px;border-radius:8px;overflow:hidden;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--sep)}
+.z-library-pl-info{flex:1;min-width:0}
+.z-library-pl-name{font-size:14px;font-weight:700;letter-spacing:-0.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-library-pl-sub{font-size:11px;color:var(--text-2)}
 
-/* ─── PRICING ─── */
-.pricing-grid{display:grid;gap:12px}
-.price-card{padding:20px;border:1px solid var(--line);border-radius:16px;background:#ffffff;position:relative}
-.price-card.featured{border-color:rgba(0,113,227,0.3);background:radial-gradient(ellipse at top,rgba(0,113,227,0.04),transparent 70%),#ffffff}
-.price-card.featured::before{content:'MOST DEPLOYED';position:absolute;top:14px;right:14px;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1px;color:var(--blue-2);background:rgba(0,113,227,0.08);padding:3px 7px;border-radius:4px;font-weight:700}
-.price-tier{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;font-weight:600}
-.price-name{font-size:22px;font-weight:800;letter-spacing:-0.5px;margin-bottom:4px}
-.price-tagline{font-size:12px;color:rgba(0,0,0,0.5);margin-bottom:16px;line-height:1.4}
-.price-amount{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.price-num{font-size:32px;font-weight:800;letter-spacing:-1.5px;line-height:1}
-.price-num span{font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0}
-.price-per{font-size:11px;color:var(--muted);margin-top:4px}
-.price-features{list-style:none;margin-bottom:18px;display:flex;flex-direction:column;gap:8px}
-.price-features li{font-size:12px;color:rgba(0,0,0,0.65);display:flex;align-items:flex-start;gap:8px;line-height:1.4}
-.price-features li::before{content:'';width:13px;height:13px;background:rgba(0,113,227,0.1);border-radius:50%;flex-shrink:0;margin-top:2px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230071e3'%3E%3Cpath d='M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z'/%3E%3C/svg%3E");background-size:9px;background-position:center;background-repeat:no-repeat}
-.price-cta{width:100%;padding:11px;border-radius:100px;background:rgba(0,0,0,0.04);border:1px solid var(--line-2);color:#1d1d1f;font-size:12px;font-weight:600;transition:all 0.2s}
-.price-cta:active{transform:scale(0.97)}
-.price-card.featured .price-cta{background:var(--blue);border-color:var(--blue);color:#fff}
+/* Queue section */
+.z-queue-section{margin-top:28px}
+.z-queue-controls{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.z-queue-btn{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--bg-2);display:flex;align-items:center;justify-content:center;
+}
+.z-queue-btn svg{width:16px;height:16px}
+.z-queue-btn.primary{background:var(--accent);color:#fff;width:44px;height:44px;box-shadow:0 4px 12px rgba(250,35,59,0.3)}
+.z-queue-btn.primary svg{width:18px;height:18px}
+.z-queue-btn:active{transform:scale(0.92)}
+.z-queue-count{font-family:-apple-system,'SF Mono',monospace;font-size:12px;color:var(--text-2);font-weight:600}
 
-/* ─── EXIT QUOTE ─── */
-.exit-quote{font-family:'Instrument Serif',serif;font-size:24px;line-height:1.3;letter-spacing:-0.5px;margin-bottom:18px;font-weight:400;text-align:center}
-.exit-quote em{font-style:italic;color:var(--blue-2)}
-.exit-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;text-align:center}
+.z-queue-list{display:flex;flex-direction:column;gap:2px}
+.z-queue-item{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;cursor:pointer;transition:background 0.1s;
+}
+.z-queue-item:hover{background:var(--bg-2)}
+.z-queue-item.active{background:rgba(250,35,59,0.06)}
+.z-queue-item-art{width:36px;height:36px;border-radius:6px;overflow:hidden;flex-shrink:0}
+.z-queue-item-art img{width:100%;height:100%;object-fit:cover}
+.z-queue-item-info{flex:1;min-width:0}
+.z-queue-item-title{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-queue-item-artist{font-size:11px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ─── FOOTER ─── */
-footer{padding:32px 18px 100px;border-top:1px solid var(--line);background:#ffffff}
-.footer-meta{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.8px;text-align:center;line-height:1.7}
+.z-eq-bars{display:flex;gap:2px;align-items:end;height:16px;flex-shrink:0}
+.z-eq-bar{width:3px;background:var(--accent);border-radius:1px;animation:z-eq 0.8s ease-in-out infinite}
+.z-eq-bar:nth-child(1){animation-delay:0s;height:60%}
+.z-eq-bar:nth-child(2){animation-delay:0.2s;height:100%}
+.z-eq-bar:nth-child(3){animation-delay:0.4s;height:40%}
+@keyframes z-eq{0%,100%{height:30%}50%{height:100%}}
 
-/* ─── BOTTOM TAB BAR ─── */
-.tab-bar{position:fixed;bottom:0;left:0;right:0;z-index:90;display:flex;justify-content:space-around;align-items:flex-start;padding:8px 4px 6px;background:rgba(255,255,255,0.92);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-top:0.5px solid rgba(0,0,0,0.08);max-width:520px;margin:0 auto}
-.tab-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 0;min-width:0;color:rgba(0,0,0,0.35);background:none;border:none;cursor:pointer;font-size:9px;font-weight:600;letter-spacing:0.3px;transition:color 0.2s;-webkit-tap-highlight-color:transparent;font-family:'JetBrains Mono',monospace}
-.tab-btn svg{width:20px;height:20px;transition:transform 0.2s}
-.tab-btn:hover{color:rgba(0,0,0,0.6)}
-.tab-btn.active{color:var(--blue-2)}
-.tab-btn.active svg{transform:scale(1.1)}
-.tab-badge{position:absolute;top:-2px;right:50%;transform:translateX(12px);font-family:'JetBrains Mono',monospace;font-size:7px;font-weight:700;background:var(--blue);color:#fff;padding:1px 4px;border-radius:6px;line-height:1.2;min-width:14px;text-align:center}
-.tab-btn{position:relative}
+/* ─── DNA TAB ─── */
+.z-dna{padding:8px 20px 20px}
+.z-dna-hero{margin-bottom:24px}
+.z-dna-eyebrow{
+  font-family:-apple-system,'SF Mono',monospace;font-size:11px;color:var(--accent);
+  letter-spacing:1.4px;font-weight:700;margin-bottom:10px;
+}
+.z-dna-h2{font-size:26px;font-weight:800;letter-spacing:-0.8px;line-height:1.1;margin-bottom:10px}
+.z-dna-p{font-size:14px;color:var(--text-2);line-height:1.5}
+
+.z-pillars{display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
+.z-pillar{padding:18px;background:#fff;border-radius:14px;box-shadow:var(--card-shadow)}
+.z-pillar-label{font-family:-apple-system,'SF Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1.2px;font-weight:700;margin-bottom:8px}
+.z-pillar-title{font-size:15px;font-weight:700;letter-spacing:-0.2px;margin-bottom:4px}
+.z-pillar-desc{font-size:13px;color:var(--text-2);line-height:1.5}
+
+/* DNA sub-tabs */
+.z-dna-tabs{
+  display:flex;gap:4px;margin-bottom:20px;padding:3px;background:var(--bg-2);border-radius:10px;
+}
+.z-dna-tab{
+  flex:1;padding:8px 0;border-radius:8px;font-size:12px;font-weight:600;color:var(--text-2);
+  text-align:center;transition:all 0.2s;
+}
+.z-dna-tab.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+
+/* Radar */
+.z-radar{margin-bottom:20px}
+.z-radar-svg{width:100%;height:auto;display:block}
+.z-radar-legend{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+.z-radar-attr{display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg-2);border-radius:8px;font-size:12px}
+.z-radar-name{color:var(--text-2);font-family:-apple-system,'SF Mono',monospace;font-size:10px;letter-spacing:0.4px}
+.z-radar-val{color:var(--accent);font-weight:700;font-family:-apple-system,'SF Mono',monospace;font-size:11px}
+
+/* Neighbors */
+.z-neighbors{display:flex;flex-direction:column;gap:2px}
+.z-neighbor{
+  display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid rgba(60,60,67,0.06);cursor:pointer;
+}
+.z-neighbor:last-child{border-bottom:none}
+.z-neighbor-rank{width:20px;font-family:-apple-system,'SF Mono',monospace;font-size:11px;color:var(--text-3);text-align:right;flex-shrink:0}
+.z-neighbor-art{width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0}
+.z-neighbor-art img{width:100%;height:100%;object-fit:cover}
+.z-neighbor-info{flex:1;min-width:0}
+.z-neighbor-title{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-neighbor-artist{font-size:12px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-neighbor-score{font-family:-apple-system,'SF Mono',monospace;font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0}
+
+/* Genres */
+.z-genres{display:flex;flex-direction:column;gap:12px}
+.z-genre-row{display:grid;grid-template-columns:100px 1fr 44px;gap:10px;align-items:center}
+.z-genre-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-genre-track{height:6px;background:var(--bg-2);border-radius:3px;overflow:hidden}
+.z-genre-fill{height:100%;border-radius:3px}
+.z-genre-pct{font-family:-apple-system,'SF Mono',monospace;font-size:12px;font-weight:700;text-align:right}
+
+/* Market */
+.z-market{display:flex;flex-direction:column;gap:0}
+.z-market-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.z-market-stat{background:#fff;border-radius:12px;padding:14px;box-shadow:var(--card-shadow)}
+.z-market-label{font-family:-apple-system,'SF Mono',monospace;font-size:10px;color:var(--text-2);letter-spacing:0.6px;margin-bottom:4px}
+.z-market-val{font-size:20px;font-weight:800;letter-spacing:-0.5px}
+.z-market-cities-label{font-family:-apple-system,'SF Mono',monospace;font-size:11px;color:var(--text-2);letter-spacing:1px;font-weight:700;margin-bottom:10px}
+.z-market-city{display:grid;grid-template-columns:20px 1fr 50px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(60,60,67,0.06);font-size:13px}
+.z-market-city:last-child{border-bottom:none}
+.z-market-city-rank{font-family:-apple-system,'SF Mono',monospace;font-size:10px;color:var(--text-3)}
+.z-market-city-name{font-weight:500}
+.z-market-city-val{font-family:-apple-system,'SF Mono',monospace;font-size:12px;color:var(--accent);text-align:right;font-weight:700}
+
+/* DSP Grid */
+.z-dsp-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.z-dsp-card{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:var(--card-shadow)}
+.z-dsp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.z-dsp-dot.live{background:var(--green);box-shadow:0 0 8px var(--green);animation:z-pulse 2s ease-in-out infinite}
+.z-dsp-dot.pilot{background:#ff9f0a;box-shadow:0 0 6px rgba(255,159,10,0.5)}
+.z-dsp-dot.queue{background:var(--text-3)}
+.z-dsp-info{flex:1;min-width:0}
+.z-dsp-name{font-size:14px;font-weight:700;letter-spacing:-0.2px}
+.z-dsp-meta{font-size:11px;color:var(--text-2);margin-top:1px}
+.z-dsp-tag{font-family:-apple-system,'SF Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.6px;padding:4px 8px;border-radius:6px;flex-shrink:0}
+.z-dsp-tag.live{background:rgba(52,199,89,0.1);color:var(--green)}
+.z-dsp-tag.pilot{background:rgba(255,159,10,0.1);color:#cc7700}
+.z-dsp-tag.queue{background:var(--bg-2);color:var(--text-3)}
+
+/* Pricing */
+.z-pricing{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.z-price-card{padding:18px;background:#fff;border-radius:14px;box-shadow:var(--card-shadow)}
+.z-price-card.featured{box-shadow:0 2px 16px rgba(250,35,59,0.12);border:1px solid rgba(250,35,59,0.15)}
+.z-price-tier{font-family:-apple-system,'SF Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--text-3);margin-bottom:4px}
+.z-price-name{font-size:18px;font-weight:800;letter-spacing:-0.3px;margin-bottom:4px}
+.z-price-amount{font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:4px}
+.z-price-amount span{font-size:13px;font-weight:500;color:var(--text-2)}
+.z-price-detail{font-size:12px;color:var(--text-2);margin-bottom:12px}
+.z-price-btn{
+  width:100%;padding:10px;border-radius:100px;font-size:13px;font-weight:600;
+  background:var(--bg-2);color:var(--text);transition:transform 0.15s;
+}
+.z-price-btn:active{transform:scale(0.97)}
+.z-price-btn.primary{background:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(250,35,59,0.25)}
+
+/* Exit quote */
+.z-exit-quote{
+  font-size:18px;font-weight:600;letter-spacing:-0.3px;line-height:1.4;
+  text-align:center;color:var(--text-2);margin:24px 0 8px;
+}
+.z-exit-meta{
+  font-family:-apple-system,'SF Mono',monospace;font-size:10px;color:var(--text-3);
+  letter-spacing:1px;text-align:center;margin-bottom:20px;
+}
+
+/* JSON */
+.z-json{padding:0}
+.z-json pre{
+  background:var(--bg-2);border-radius:12px;padding:16px;
+  font-family:-apple-system,'SF Mono','JetBrains Mono',monospace;font-size:11px;
+  color:var(--text);line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all;
+  margin-bottom:12px;
+}
+.z-copy-btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;padding:10px;border-radius:10px;
+  background:var(--bg-2);font-size:13px;font-weight:600;color:var(--text-2);transition:transform 0.15s;
+}
+.z-copy-btn:active{transform:scale(0.97)}
+.z-copy-btn svg{width:14px;height:14px}
 
 /* ─── MINI PLAYER ─── */
-.mini-player{position:fixed;bottom:56px;left:0;right:0;z-index:100;background:rgba(255,255,255,0.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);box-shadow:0 -2px 12px rgba(0,0,0,0.06);padding:8px 14px;display:flex;align-items:center;gap:10px;max-width:520px;margin:0 auto}
-.mini-player-art{width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0}
-.mini-player-info{flex:1;min-width:0}
-.mini-player-track{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mini-player-artist{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mini-player-progress{position:absolute;top:-2px;left:0;right:0;height:2px;background:rgba(0,0,0,0.08)}
-.mini-player-progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--violet));transition:width 0.3s linear}
-.mini-player-btn{width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.15s}
-.mini-player-btn:active{transform:scale(0.9)}
+.z-mini-player{
+  position:fixed;bottom:60px;left:0;right:0;z-index:100;
+  background:rgba(255,255,255,0.97);
+  backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  box-shadow:0 -1px 0 rgba(0,0,0,0.04);
+  padding:8px 16px;display:flex;align-items:center;gap:10px;
+  max-width:520px;margin:0 auto;
+}
+.z-mini-progress{position:absolute;top:0;left:0;right:0;height:2px;background:rgba(0,0,0,0.06)}
+.z-mini-progress-fill{height:100%;background:var(--accent);transition:width 0.3s linear}
+.z-mini-art{width:42px;height:42px;border-radius:8px;overflow:hidden;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.z-mini-art img{width:100%;height:100%;object-fit:cover}
+.z-mini-info{flex:1;min-width:0}
+.z-mini-track{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-mini-artist{font-size:11px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-mini-btn{
+  width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:transform 0.15s;
+}
+.z-mini-btn:first-of-type{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(250,35,59,0.25)}
+.z-mini-btn:last-of-type{background:var(--bg-2);color:var(--text-2)}
+.z-mini-btn:active{transform:scale(0.9)}
+.z-mini-btn svg{width:14px;height:14px}
+
+/* ─── TAB BAR ─── */
+.z-tab-bar{
+  position:fixed;bottom:0;left:0;right:0;z-index:90;
+  display:flex;justify-content:space-around;align-items:flex-start;
+  padding:6px 4px 8px;
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:0 -1px 0 rgba(0,0,0,0.04);
+  max-width:520px;margin:0 auto;
+}
+@supports(padding-bottom: env(safe-area-inset-bottom)){
+  .z-tab-bar{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+}
+.z-tab{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:2px 0;color:var(--text-3);font-size:10px;font-weight:500;
+  letter-spacing:0.2px;transition:color 0.2s;min-width:0;
+}
+.z-tab svg{width:24px;height:24px;transition:transform 0.15s}
+.z-tab.active{color:var(--accent)}
+.z-tab.active svg{transform:scale(1.05)}
 
 /* ─── TOAST ─── */
-.toast{position:fixed;top:62px;left:50%;transform:translateX(-50%) translateY(-100px);background:linear-gradient(135deg,var(--blue),var(--violet));color:#fff;padding:10px 18px;border-radius:100px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,113,227,0.3);transition:transform 0.3s cubic-bezier(0.32,0.72,0,1);display:flex;align-items:center;gap:8px;white-space:nowrap;max-width:calc(100vw - 36px)}
-.toast.show{transform:translateX(-50%) translateY(0)}
-.toast svg{width:14px;height:14px;flex-shrink:0}
-
-/* ─── DESKTOP ─── */
-@media(min-width:720px){
-  .app{max-width:520px;margin:0 auto;box-shadow:0 0 60px rgba(0,0,0,0.06);border-left:1px solid var(--line);border-right:1px solid var(--line)}
-  .ticker{grid-template-columns:repeat(4,1fr)}
-  .market-grid{grid-template-columns:repeat(4,1fr)}
+.z-toast{
+  position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-100px);
+  background:var(--accent);color:#fff;padding:10px 20px;border-radius:100px;
+  font-size:13px;font-weight:600;z-index:9999;
+  box-shadow:0 8px 24px rgba(250,35,59,0.3);
+  transition:transform 0.3s cubic-bezier(0.32,0.72,0,1);
+  display:flex;align-items:center;gap:8px;white-space:nowrap;max-width:calc(100vw - 36px);
 }
+.z-toast.show{transform:translateX(-50%) translateY(0)}
+.z-toast svg{width:14px;height:14px;flex-shrink:0}
 
 *::-webkit-scrollbar{display:none}
 `;
