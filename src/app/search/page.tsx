@@ -51,11 +51,13 @@ function PlayButton({
   appleId,
   playing,
   onPlay,
+  onStop,
   size = "md",
 }: {
   appleId?: number;
   playing: number | null;
-  onPlay: (id: number | null) => void;
+  onPlay: (id: number) => void;
+  onStop?: () => void;
   size?: "sm" | "md";
 }) {
   if (!appleId) return null;
@@ -65,7 +67,11 @@ function PlayButton({
     <button
       onClick={(e) => {
         e.stopPropagation();
-        onPlay(isPlaying ? null : appleId);
+        if (isPlaying) {
+          onStop?.();
+        } else {
+          onPlay(appleId);
+        }
       }}
       className={`${sz} rounded-lg bg-gradient-to-br from-accent-purple/20 to-accent-blue/20 flex items-center justify-center shrink-0 hover:from-accent-purple/40 hover:to-accent-blue/40 transition-all`}
     >
@@ -478,7 +484,7 @@ export default function SearchPage() {
                     <PlayButton
                       appleId={song.appleId}
                       playing={playing}
-                      onPlay={startPlaying}
+                      onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }}
                       size="sm"
                     />
                     <div className="flex-1 min-w-0">
@@ -567,7 +573,7 @@ export default function SearchPage() {
                     <PlayButton
                       appleId={song.appleId}
                       playing={playing}
-                      onPlay={startPlaying}
+                      onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{song.title}</div>
@@ -712,7 +718,7 @@ export default function SearchPage() {
                         >
                           <td className="px-4 py-3 text-text-muted font-mono">{i + 1}</td>
                           <td className="px-2 py-3">
-                            <PlayButton appleId={song.appleId} playing={playing} onPlay={startPlaying} size="sm" />
+                            <PlayButton appleId={song.appleId} playing={playing} onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }} size="sm" />
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-medium">{song.title}</div>
@@ -774,7 +780,7 @@ export default function SearchPage() {
                   <PlayButton
                     appleId={selected.song.appleId}
                     playing={playing}
-                    onPlay={startPlaying}
+                    onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }}
                   />
                   <div className="flex-1 min-w-0">
                     <h2 className="text-2xl font-bold">
@@ -866,7 +872,7 @@ export default function SearchPage() {
                             <PlayButton
                               appleId={sim.appleId}
                               playing={playing}
-                              onPlay={startPlaying}
+                              onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }}
                               size="sm"
                             />
                           </td>
