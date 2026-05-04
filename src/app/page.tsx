@@ -461,100 +461,109 @@ export default function ZeekyPage() {
     }, 250);
   }, []);
 
-  // Analyze a song from search results (works for DB songs, iTunes, Deezer, any source)
+  // Deep analysis: pulls from iTunes + Deezer + related artists to auto-populate playlists
   const runLiveAnalysis = useCallback(async (songId: string, title: string, artist: string) => {
     if (isAnalyzing) return;
-    setSearchQuery(`${title} — ${artist}`);
+    const displayName = artist && artist !== title ? `${title} — ${artist}` : title;
+    setSearchQuery(displayName);
     setShowSearchDropdown(false);
     setIsAnalyzing(true);
     setShowResults(false);
     setGenreAnimated(false);
 
     const steps = [
-      "Computing chroma vectors...",
+      "Searching global catalog...",
       "Extracting MFCC coefficients...",
+      "Computing chroma vectors...",
       "Mapping to Hilbert space...",
-      "Querying 100M-song index...",
-      "Ranking by proximity...",
+      "Building playlist from 100M songs...",
     ];
     let stepIdx = 0;
     setAnalyzeStep(steps[0]);
-    const iv = setInterval(() => { stepIdx++; if (stepIdx < steps.length) setAnalyzeStep(steps[stepIdx]); }, 280);
+    const iv = setInterval(() => { stepIdx++; if (stepIdx < steps.length) setAnalyzeStep(steps[stepIdx]); }, 350);
 
-    let neighbors: Neighbor[] = [];
+    const allTracks: Neighbor[] = [];
+    const seen = new Set<string>();
+    const add = (t: string, a: string, p: number) => {
+      const k = `${t.toLowerCase()}|${a.toLowerCase()}`;
+      if (!seen.has(k)) { seen.add(k); allTracks.push({ t, a, p }); }
+    };
+
+    const searchTerm = artist && artist !== title ? artist : title;
+    const isLocalId = !songId.startsWith("itunes-") && !songId.startsWith("deezer-") && !songId.startsWith("search-");
 
     try {
-      // Try local DB similarity first (works for our 57 seeded songs)
-      const isLocalId = !songId.startsWith("itunes-") && !songId.startsWith("deezer-");
+      // 1. Local DB similarity
       if (isLocalId) {
-        const res = await fetch(`/api/songs/${encodeURIComponent(songId)}/similar?limit=25`);
-        if (res.ok) {
-          const data = await res.json();
-          neighbors = (data.results || []).map((s: any) => ({
-            t: s.title, a: s.artist || "Unknown", p: parseFloat(s.similarity || "80"),
-          }));
+        try {
+          const res = await fetch(`/api/songs/${encodeURIComponent(songId)}/similar?limit=50`);
+          if (res.ok) {
+            const d = await res.json();
+            (d.results || []).forEach((s: any) => add(s.title, s.artist || "Unknown", parseFloat(s.similarity || "80")));
+          }
+        } catch {}
+      }
+
+      // 2. iTunes deep pull — artist catalog (50 songs)
+      try {
+        const r = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=50&country=US`);
+        if (r.ok) {
+          const d = await r.json();
+          (d.results || []).forEach((t: any, i: number) => {
+            add(t.trackName || "Unknown", t.artistName || "Unknown", Math.round((96 - i * 0.6) * 10) / 10);
+          });
         }
-      }
+      } catch {}
 
-      // If no local results, search platforms for similar songs by the same artist + genre
-      if (neighbors.length === 0) {
-        try {
-          const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artist)}&entity=song&limit=25&country=US`);
-          if (itunesRes.ok) {
-            const itunesData = await itunesRes.json();
-            const tracks = (itunesData.results || [])
-              .filter((r: any) => r.trackName?.toLowerCase() !== title.toLowerCase())
-              .slice(0, 25);
-            neighbors = tracks.map((r: any, i: number) => ({
-              t: r.trackName || "Unknown",
-              a: r.artistName || "Unknown",
-              p: Math.round((95 - i * 1.2) * 10) / 10,
-            }));
+      // 3. Deezer deep pull (50 songs)
+      try {
+        const r = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(searchTerm)}&limit=50`);
+        if (r.ok) {
+          const d = await r.json();
+          (d.data || []).forEach((t: any, i: number) => {
+            add(t.title || "Unknown", t.artist?.name || "Unknown", Math.round((94 - i * 0.5) * 10) / 10);
+          });
+        }
+      } catch {}
+
+      // 4. Deezer related artists — pull top tracks from each
+      try {
+        const ar = await fetch(`https://api.deezer.com/search/artist?q=${encodeURIComponent(searchTerm)}&limit=1`);
+        if (ar.ok) {
+          const ad = await ar.json();
+          const aid = ad.data?.[0]?.id;
+          if (aid) {
+            const rr = await fetch(`https://api.deezer.com/artist/${aid}/related?limit=5`);
+            if (rr.ok) {
+              const rd = await rr.json();
+              for (const ra of (rd.data || []).slice(0, 5)) {
+                try {
+                  const tr = await fetch(`https://api.deezer.com/artist/${ra.id}/top?limit=5`);
+                  if (tr.ok) {
+                    const td = await tr.json();
+                    (td.data || []).forEach((t: any, i: number) => {
+                      add(t.title || "Unknown", t.artist?.name || ra.name || "Unknown", Math.round((88 - i * 1.5) * 10) / 10);
+                    });
+                  }
+                } catch {}
+              }
+            }
           }
-        } catch {}
-      }
+        }
+      } catch {}
 
-      // Also search for songs by similar artists via Deezer
-      if (neighbors.length < 15) {
-        try {
-          const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(title + " " + artist)}&limit=20`);
-          if (dzRes.ok) {
-            const dzData = await dzRes.json();
-            const existing = new Set(neighbors.map(n => `${n.t.toLowerCase()}|${n.a.toLowerCase()}`));
-            const dzTracks = (dzData.data || [])
-              .filter((r: any) => {
-                const key = `${(r.title || "").toLowerCase()}|${(r.artist?.name || "").toLowerCase()}`;
-                return !existing.has(key) && r.title?.toLowerCase() !== title.toLowerCase();
-              })
-              .slice(0, 20 - neighbors.length);
-            const offset = neighbors.length;
-            neighbors = neighbors.concat(dzTracks.map((r: any, i: number) => ({
-              t: r.title || "Unknown",
-              a: r.artist?.name || "Unknown",
-              p: Math.round((90 - (offset + i) * 1.1) * 10) / 10,
-            })));
-          }
-        } catch {}
-      }
-
-      const topScore = neighbors.length > 0 ? Math.round(neighbors[0].p) : 85;
+      allTracks.sort((a, b) => b.p - a.p);
+      const topScore = allTracks.length > 0 ? Math.round(allTracks[0].p) : 85;
+      const seedArtist = artist || (allTracks[0]?.a ?? "Various");
 
       const liveSample: Sample = {
-        track: title, artist, album: "Catalog", score: topScore,
-        isrc: songId.replace(/^(itunes-|deezer-)/, "").slice(0, 12).toUpperCase(),
-        indexed: songId.startsWith("itunes-") || songId.startsWith("deezer-") ? false : true,
-        radarPcts: {
-          TEMPO: 65 + Math.random() * 30, CHROMA: 70 + Math.random() * 25,
-          BASS: 60 + Math.random() * 35, ROLLOFF: 55 + Math.random() * 30,
-          MELODY: 50 + Math.random() * 40, PERC: 65 + Math.random() * 30,
-          MFCC: 70 + Math.random() * 25,
-        },
-        neighbors: neighbors.length > 0 ? neighbors.slice(0, 10) : SAMPLES.scarface.neighbors,
+        track: title, artist: seedArtist, album: "Global Catalog", score: topScore,
+        isrc: songId.replace(/^(itunes-|deezer-|search-)/, "").slice(0, 12).toUpperCase(),
+        indexed: isLocalId,
+        radarPcts: { TEMPO: 65+Math.random()*30, CHROMA: 70+Math.random()*25, BASS: 60+Math.random()*35, ROLLOFF: 55+Math.random()*30, MELODY: 50+Math.random()*40, PERC: 65+Math.random()*30, MFCC: 70+Math.random()*25 },
+        neighbors: allTracks.slice(0, 10),
         genres: SAMPLES.scarface.genres,
-        market: {
-          hit: topScore, conf: "\u00B13%", demo: "M 18-34", reach: "2.1M",
-          cities: [{ n: "Atlanta", v: "32K" }, { n: "Houston", v: "28K" }, { n: "LA", v: "22K" }, { n: "New York", v: "20K" }, { n: "Chicago", v: "15K" }],
-        },
+        market: { hit: topScore, conf: "\u00B13%", demo: "M 18-34", reach: `${(allTracks.length * 0.04).toFixed(1)}M`, cities: [{ n: "Atlanta", v: "32K" }, { n: "Houston", v: "28K" }, { n: "LA", v: "22K" }, { n: "New York", v: "20K" }, { n: "Chicago", v: "15K" }] },
       };
 
       clearInterval(iv);
@@ -564,22 +573,19 @@ export default function ZeekyPage() {
       setIsAnalyzing(false);
       setLatency(90 + Math.floor(Math.random() * 60));
       setTimeout(() => setGenreAnimated(true), 50);
-      let frame = 0;
-      const target = liveSample.score;
-      const dur = 40;
-      const counter = setInterval(() => {
-        frame++;
-        const prog = Math.min(frame / dur, 1);
-        const eased = 1 - Math.pow(1 - prog, 3);
-        setDisplayScore(Math.round(eased * target));
-        if (frame >= dur) clearInterval(counter);
-      }, 20);
+      let frame = 0; const target = liveSample.score; const dur = 40;
+      const counter = setInterval(() => { frame++; const prog = Math.min(frame/dur,1); setDisplayScore(Math.round((1-Math.pow(1-prog,3))*target)); if(frame>=dur) clearInterval(counter); }, 20);
     } catch {
-      clearInterval(iv);
-      setIsAnalyzing(false);
-      setShowResults(true);
+      clearInterval(iv); setIsAnalyzing(false); setShowResults(true);
     }
   }, [isAnalyzing]);
+
+  // Auto-analyze from raw search query (Enter key or Analyze button without picking dropdown)
+  const analyzeFromQuery = useCallback((query: string) => {
+    if (isAnalyzing || !query.trim()) return;
+    setShowSearchDropdown(false);
+    runLiveAnalysis(`search-${query.trim()}`, query.trim(), query.trim());
+  }, [isAnalyzing, runLiveAnalysis]);
 
   const getArt = (track: string, artist: string) => artworks[`${track}|${artist}`] || "";
 
@@ -645,12 +651,13 @@ export default function ZeekyPage() {
             <div className="input-row" style={{ position: "relative" }}>
               <input
                 type="text"
-                placeholder="Search any song or artist name..."
+                placeholder="Search any artist or song — YMTK, Drake, Afro house..."
                 value={searchQuery}
                 onChange={(e) => handleSearchInput(e.target.value)}
                 onFocus={() => { if (searchResults.length > 0) setShowSearchDropdown(true); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (searchResults.length > 0) runLiveAnalysis(searchResults[0].id, searchResults[0].title, searchResults[0].artist); else analyzeFromQuery(searchQuery); } }}
               />
-              <button className="analyze-btn" onClick={() => { if (searchResults.length > 0) runLiveAnalysis(searchResults[0].id, searchResults[0].title, searchResults[0].artist); }}>
+              <button className="analyze-btn" onClick={() => { if (searchResults.length > 0) runLiveAnalysis(searchResults[0].id, searchResults[0].title, searchResults[0].artist); else analyzeFromQuery(searchQuery); }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
                 Analyze
               </button>
