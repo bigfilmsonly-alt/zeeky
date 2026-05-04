@@ -150,18 +150,43 @@ export default function SearchPage() {
       .catch(() => {});
   }, []);
 
-  // Handle audio playback with auto-advance
+  // Create a single persistent audio element (required for iOS auto-play)
   useEffect(() => {
-    if (!playing) {
+    if (!audioRef.current) {
+      const audio = new Audio();
+      audio.volume = 0.7;
+      audioRef.current = audio;
+    }
+    return () => {
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current = null;
+        audioRef.current.src = "";
       }
+    };
+  }, []);
+
+  // Advance to next track in queue
+  const advanceQueue = useCallback(() => {
+    setPlayQueue((prev) => {
+      const next = prev.slice(1);
+      if (next.length > 0) {
+        setPlaying(next[0]);
+        return next;
+      }
+      setPlaying(null);
+      return [];
+    });
+  }, []);
+
+  // Handle audio playback with auto-advance
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (!playing) {
+      audio.pause();
       setNowPlayingTitle("");
       return;
-    }
-    if (audioRef.current) {
-      audioRef.current.pause();
     }
 
     // Find label for now-playing display
@@ -182,56 +207,18 @@ export default function SearchPage() {
           if (track.trackName && track.artistName) {
             setNowPlayingTitle(`${track.trackName} — ${track.artistName}`);
           }
-          const audio = new Audio(track.previewUrl);
-          audio.volume = 0.7;
-          audio.play().catch(() => {});
-          audio.onended = () => {
-            // Auto-advance to next song in queue
-            setPlayQueue((prev) => {
-              const next = prev.slice(1);
-              if (next.length > 0) {
-                setPlaying(next[0]);
-                return next;
-              }
-              setPlaying(null);
-              return [];
-            });
-          };
-          audioRef.current = audio;
+          // Reuse the same audio element (critical for iOS auto-play)
+          audio.src = track.previewUrl;
+          audio.onended = advanceQueue;
+          audio.onerror = advanceQueue;
+          audio.play().catch(() => advanceQueue());
         } else {
-          // No preview — skip to next
-          setPlayQueue((prev) => {
-            const next = prev.slice(1);
-            if (next.length > 0) {
-              setPlaying(next[0]);
-              return next;
-            }
-            setPlaying(null);
-            return [];
-          });
+          advanceQueue();
         }
       })
-      .catch(() => {
-        // Error — skip to next
-        setPlayQueue((prev) => {
-          const next = prev.slice(1);
-          if (next.length > 0) {
-            setPlaying(next[0]);
-            return next;
-          }
-          setPlaying(null);
-          return [];
-        });
-      });
+      .catch(() => advanceQueue());
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing]);
-
-  // Cleanup audio on unmount
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) audioRef.current.pause();
-    };
-  }, []);
+  }, [playing, advanceQueue]);
 
   const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
@@ -338,24 +325,14 @@ export default function SearchPage() {
               )}
             </div>
             <button
-              onClick={() => {
-                // Skip to next
-                setPlayQueue((prev) => {
-                  const next = prev.slice(1);
-                  if (next.length > 0) {
-                    setPlaying(next[0]);
-                    return next;
-                  }
-                  setPlaying(null);
-                  return [];
-                });
-              }}
+              onClick={() => advanceQueue()}
               className="px-3 py-1 text-xs text-text-muted hover:text-white transition-colors border border-white/10 rounded-full"
             >
               Skip
             </button>
             <button
               onClick={() => {
+                if (audioRef.current) audioRef.current.pause();
                 setPlaying(null);
                 setPlayQueue([]);
               }}
@@ -484,7 +461,7 @@ export default function SearchPage() {
                     <PlayButton
                       appleId={song.appleId}
                       playing={playing}
-                      onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }}
+                      onPlay={startPlaying} onStop={() => { if (audioRef.current) audioRef.current.pause(); setPlaying(null); setPlayQueue([]); }}
                       size="sm"
                     />
                     <div className="flex-1 min-w-0">
@@ -573,7 +550,7 @@ export default function SearchPage() {
                     <PlayButton
                       appleId={song.appleId}
                       playing={playing}
-                      onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }}
+                      onPlay={startPlaying} onStop={() => { if (audioRef.current) audioRef.current.pause(); setPlaying(null); setPlayQueue([]); }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{song.title}</div>
@@ -718,7 +695,7 @@ export default function SearchPage() {
                         >
                           <td className="px-4 py-3 text-text-muted font-mono">{i + 1}</td>
                           <td className="px-2 py-3">
-                            <PlayButton appleId={song.appleId} playing={playing} onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }} size="sm" />
+                            <PlayButton appleId={song.appleId} playing={playing} onPlay={startPlaying} onStop={() => { if (audioRef.current) audioRef.current.pause(); setPlaying(null); setPlayQueue([]); }} size="sm" />
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-medium">{song.title}</div>
@@ -780,7 +757,7 @@ export default function SearchPage() {
                   <PlayButton
                     appleId={selected.song.appleId}
                     playing={playing}
-                    onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }}
+                    onPlay={startPlaying} onStop={() => { if (audioRef.current) audioRef.current.pause(); setPlaying(null); setPlayQueue([]); }}
                   />
                   <div className="flex-1 min-w-0">
                     <h2 className="text-2xl font-bold">
@@ -872,7 +849,7 @@ export default function SearchPage() {
                             <PlayButton
                               appleId={sim.appleId}
                               playing={playing}
-                              onPlay={startPlaying} onStop={() => { setPlaying(null); setPlayQueue([]); }}
+                              onPlay={startPlaying} onStop={() => { if (audioRef.current) audioRef.current.pause(); setPlaying(null); setPlayQueue([]); }}
                               size="sm"
                             />
                           </td>
