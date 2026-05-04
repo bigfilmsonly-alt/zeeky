@@ -156,3 +156,74 @@ export function getByGenre(genre: string, limit = 50): SongResult[] {
     .slice(0, limit)
     .map(songToResult);
 }
+
+export function getArtistPlaylist(artistQuery: string, playlistSize = 50): {
+  artist: string;
+  artistSongs: SongResult[];
+  playlist: SimilarSong[];
+} | null {
+  const songs = loadCatalog();
+  const map = getIdMap();
+  const q = artistQuery.toLowerCase().trim();
+
+  // Find all songs by this artist
+  const artistSongs = songs
+    .filter((s) => s.artist.toLowerCase().includes(q))
+    .sort((a, b) => b.rank - a.rank);
+
+  if (artistSongs.length === 0) return null;
+
+  // Get canonical artist name from top-ranked song
+  const artistName = artistSongs[0].artist;
+
+  // Collect artist's own song IDs to exclude from playlist
+  const artistIds = new Set(artistSongs.map((s) => s.id));
+
+  // Aggregate DNA neighbors from all artist songs, weighted by rank
+  const neighborScores = new Map<number, { totalScore: number; count: number }>();
+
+  for (const song of artistSongs) {
+    for (const sim of song.similars) {
+      if (artistIds.has(sim.id)) continue; // skip artist's own songs
+      const existing = neighborScores.get(sim.id);
+      // Weight similarity by the source song's chart rank
+      const weighted = sim.similarity * (1 + Math.min(song.rank, 20) * 0.02);
+      if (existing) {
+        existing.totalScore += weighted;
+        existing.count += 1;
+      } else {
+        neighborScores.set(sim.id, { totalScore: weighted, count: 1 });
+      }
+    }
+  }
+
+  // Rank by combined score (frequency of appearance × avg weighted similarity)
+  const ranked = [...neighborScores.entries()]
+    .map(([id, { totalScore, count }]) => ({
+      id,
+      score: (totalScore / count) * (1 + Math.log2(count) * 0.1),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, playlistSize);
+
+  const playlist: SimilarSong[] = ranked.map((r) => {
+    const s = map.get(r.id);
+    return {
+      id: r.id,
+      artist: s?.artist ?? "Unknown",
+      title: s?.title ?? "Unknown",
+      year: s?.year ?? 0,
+      genre: s?.genre ?? "",
+      peak: s?.peak ?? 0,
+      similarity: Math.round(r.score * 100) / 100,
+      dhsScore: s?.dhsScore ?? 0,
+      ...(s?.appleId ? { appleId: s.appleId } : {}),
+    };
+  });
+
+  return {
+    artist: artistName,
+    artistSongs: artistSongs.slice(0, 20).map(songToResult),
+    playlist,
+  };
+}

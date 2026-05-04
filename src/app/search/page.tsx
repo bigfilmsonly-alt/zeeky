@@ -36,17 +36,15 @@ interface SimilarsResponse {
   similars: SimilarSong[];
 }
 
+interface ArtistPlaylist {
+  artist: string;
+  artistSongs: SearchResult[];
+  playlist: SimilarSong[];
+}
+
 interface Genre {
   genre: string;
   count: number;
-}
-
-function applePreviewUrl(appleId: number) {
-  return `https://music.apple.com/song/${appleId}`;
-}
-
-function appleCoverUrl(appleId: number) {
-  return `https://is1-ssl.mzstatic.com/image/thumb/Music/${appleId}/100x100bb.jpg`;
 }
 
 function PlayButton({
@@ -94,6 +92,7 @@ export default function SearchPage() {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [activeGenre, setActiveGenre] = useState<string | null>(null);
   const [genreSongs, setGenreSongs] = useState<SearchResult[]>([]);
+  const [artistPlaylist, setArtistPlaylist] = useState<ArtistPlaylist | null>(null);
   const [playing, setPlaying] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -173,6 +172,7 @@ export default function SearchPage() {
   const selectSong = async (song: { id: number }) => {
     setLoading(true);
     setSelected(null);
+    setArtistPlaylist(null);
     try {
       const res = await fetch(`/api/dna/similars?id=${song.id}`);
       setSelected(await res.json());
@@ -180,9 +180,27 @@ export default function SearchPage() {
     setLoading(false);
   };
 
+  const loadArtistPlaylist = async (artist: string) => {
+    setLoading(true);
+    setSelected(null);
+    setArtistPlaylist(null);
+    setActiveGenre(null);
+    setResults([]);
+    try {
+      const res = await fetch(
+        `/api/dna/artist?q=${encodeURIComponent(artist)}&limit=50`
+      );
+      if (res.ok) {
+        setArtistPlaylist(await res.json());
+      }
+    } catch {}
+    setLoading(false);
+  };
+
   const loadGenre = async (genre: string) => {
     setActiveGenre(genre);
     setSelected(null);
+    setArtistPlaylist(null);
     setQuery("");
     setResults([]);
     try {
@@ -300,7 +318,7 @@ export default function SearchPage() {
         </div>
 
         {/* Genre pills */}
-        {!selected && (
+        {!selected && !artistPlaylist && (
           <div className="flex flex-wrap gap-2 justify-center mb-8">
             {genres.map((g) => (
               <button
@@ -369,9 +387,53 @@ export default function SearchPage() {
           )}
         </AnimatePresence>
 
+        {/* Artist Playlist Banner */}
+        <AnimatePresence>
+          {!selected && !artistPlaylist && !activeGenre && results.length >= 3 && (() => {
+            const firstArtist = results[0].artist;
+            const sameArtistCount = results.filter(
+              (r) => r.artist === firstArtist
+            ).length;
+            if (sameArtistCount < 3) return null;
+            return (
+              <motion.div
+                key="artist-banner"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="max-w-2xl mx-auto mb-6"
+              >
+                <button
+                  onClick={() => loadArtistPlaylist(firstArtist)}
+                  className="w-full bg-gradient-to-r from-accent-purple/10 via-accent-blue/10 to-accent-cyan/10 border border-accent-purple/20 rounded-2xl p-5 text-left hover:border-accent-purple/40 transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-purple to-accent-blue flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 text-white">
+                        <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" />
+                        <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.5" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-lg">{firstArtist}</div>
+                      <div className="text-sm text-text-muted">
+                        Generate a 50-song DNA playlist from {sameArtistCount} tracks
+                      </div>
+                    </div>
+                    <div className="px-4 py-2 rounded-full bg-accent-purple text-white text-sm font-semibold group-hover:bg-accent-purple/90 transition-colors shrink-0">
+                      Build Playlist
+                    </div>
+                  </div>
+                </button>
+              </motion.div>
+            );
+          })()}
+        </AnimatePresence>
+
         {/* Search Results */}
         <AnimatePresence mode="wait">
-          {!selected && !activeGenre && results.length > 0 && (
+          {!selected && !artistPlaylist && !activeGenre && results.length > 0 && (
             <motion.div
               key="results"
               initial={{ opacity: 0, y: 10 }}
@@ -380,7 +442,7 @@ export default function SearchPage() {
               className="max-w-2xl mx-auto mb-12"
             >
               <h2 className="text-sm text-text-muted mb-3 uppercase tracking-wider">
-                Select a song to find 50 similar tracks
+                Or select a single song for its 50 DNA matches
               </h2>
               <div className="space-y-2">
                 {results.map((song, i) => (
@@ -451,6 +513,122 @@ export default function SearchPage() {
             </span>
           </div>
         )}
+
+        {/* Artist DNA Playlist */}
+        <AnimatePresence>
+          {artistPlaylist && (
+            <motion.div
+              key="artist-playlist"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              {/* Artist header */}
+              <div className="bg-gradient-to-r from-accent-purple/10 via-accent-blue/10 to-accent-cyan/10 border border-white/5 rounded-2xl p-6 md:p-8 mb-8">
+                <button
+                  onClick={() => {
+                    setArtistPlaylist(null);
+                    setQuery("");
+                  }}
+                  className="text-sm text-text-muted hover:text-foreground transition-colors flex items-center gap-1 mb-4"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Back
+                </button>
+                <h2 className="text-3xl font-bold mb-2">
+                  <span className="gradient-text">{artistPlaylist.artist}</span>
+                </h2>
+                <p className="text-text-muted">
+                  DNA playlist generated from {artistPlaylist.artistSongs.length} tracks — 50 songs that match this artist&apos;s sound
+                </p>
+
+                {/* Artist's own songs */}
+                <div className="mt-6">
+                  <h3 className="text-xs text-text-muted/60 uppercase tracking-wider mb-3">
+                    Source Tracks ({artistPlaylist.artistSongs.length})
+                  </h3>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {artistPlaylist.artistSongs.slice(0, 10).map((song) => (
+                      <button
+                        key={song.id}
+                        onClick={() => selectSong(song)}
+                        className="min-w-[140px] bg-white/5 border border-white/10 rounded-xl p-3 text-left shrink-0 hover:border-accent-purple/30 transition-colors"
+                      >
+                        <div className="text-xs font-medium truncate">{song.title}</div>
+                        <div className="text-[10px] text-text-muted truncate mt-0.5">Peak #{song.peak} &middot; {song.weeks}wks</div>
+                        <div className="text-[10px] font-mono text-accent-purple mt-1">DHS {song.dhsScore.toFixed(1)}%</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Generated playlist */}
+              <h3 className="text-lg font-bold mb-4">
+                <span className="gradient-text">DNA Playlist</span>
+                <span className="text-sm text-text-muted font-normal ml-2">
+                  50 tracks matching {artistPlaylist.artist}&apos;s sound DNA
+                </span>
+              </h3>
+
+              <div className="bg-surface border border-white/5 rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="px-4 py-3 text-left text-text-muted font-medium w-12">#</th>
+                        <th className="px-2 py-3 w-10" />
+                        <th className="px-4 py-3 text-left text-text-muted font-medium">Song</th>
+                        <th className="px-4 py-3 text-left text-text-muted font-medium hidden md:table-cell">Genre</th>
+                        <th className="px-4 py-3 text-left text-text-muted font-medium hidden sm:table-cell">Year</th>
+                        <th className="px-4 py-3 text-right text-text-muted font-medium hidden sm:table-cell">DHS</th>
+                        <th className="px-4 py-3 text-right text-text-muted font-medium">Match</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {artistPlaylist.playlist.map((song, i) => (
+                        <motion.tr
+                          key={song.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.015 }}
+                          className="border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer"
+                          onClick={() => {
+                            selectSong(song);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        >
+                          <td className="px-4 py-3 text-text-muted font-mono">{i + 1}</td>
+                          <td className="px-2 py-3">
+                            <PlayButton appleId={song.appleId} playing={playing} onPlay={setPlaying} size="sm" />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium">{song.title}</div>
+                            <div className="text-text-muted text-xs">{song.artist}</div>
+                          </td>
+                          <td className="px-4 py-3 text-text-muted hidden md:table-cell">{song.genre.split(",")[0]}</td>
+                          <td className="px-4 py-3 text-text-muted hidden sm:table-cell">{song.year}</td>
+                          <td className="px-4 py-3 text-right hidden sm:table-cell">
+                            <span className={`font-mono text-xs ${song.dhsScore >= 45 ? "text-green-400" : song.dhsScore >= 30 ? "text-accent-purple" : "text-text-muted"}`}>
+                              {song.dhsScore.toFixed(1)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="font-mono font-medium text-accent-purple">
+                              {song.similarity.toFixed(1)}%
+                            </span>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Similar Songs Results */}
         <AnimatePresence>
