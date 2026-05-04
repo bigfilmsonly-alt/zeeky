@@ -10,7 +10,17 @@ interface ChainTrack {
   similarity: string; // "Seed" for first, "XX.XX%" for rest
   genre: string;
   dhsScore: number;
+  energyNorm: number;
   appleId?: number;
+  // Scoring breakdown for "Why this song?"
+  scoreBreakdown?: {
+    genreMatch: boolean;
+    genreLabel: string;
+    energyDiff: number;
+    dnaSimilarity: number;
+    hitScore: number;
+    totalScore: number;
+  };
 }
 
 interface SearchResult {
@@ -20,6 +30,7 @@ interface SearchResult {
   year: number;
   genre: string;
   dhsScore: number;
+  energyNorm: number;
   appleId?: number;
 }
 
@@ -35,8 +46,58 @@ interface SavedPlaylist {
   createdAt: string;
 }
 
+interface SimilarCandidate {
+  id: number;
+  artist: string;
+  title: string;
+  similarity: number;
+  genre: string;
+  dhsScore: number;
+  energyNorm: number;
+  appleId?: number;
+}
+
 const SEED_QUERIES = ["drake", "future", "kendrick", "rihanna", "weeknd", "travis", "post malone", "dua lipa"];
 const FREE_LIMIT = 10;
+
+/**
+ * Score a candidate track based on musical DNA matching.
+ * Weights: Genre 40%, Energy/Tempo 30%, DNA Similarity 20%, Hit Potential 10%
+ */
+function scoreCandidate(
+  candidate: SimilarCandidate,
+  currentTrack: ChainTrack,
+  genreFilter: string | null
+): { score: number; genreMatch: boolean; genreLabel: string; energyDiff: number } {
+  let score = 0;
+
+  // If genre filter is active and candidate doesn't match, reject entirely
+  if (genreFilter && !candidate.genre.toLowerCase().includes(genreFilter.toLowerCase())) {
+    return { score: 0, genreMatch: false, genreLabel: "", energyDiff: 0 };
+  }
+
+  // 1. Genre match (40% weight) - same genre = big bonus
+  const currentGenres = currentTrack.genre.split(",").map((g) => g.trim().toLowerCase());
+  const candidateGenres = candidate.genre.split(",").map((g) => g.trim().toLowerCase());
+  const genreOverlap = currentGenres.filter((g) => candidateGenres.includes(g)).length;
+  const genreMatch = genreOverlap > 0;
+  score += genreMatch ? 40 : 0;
+
+  // 2. Tempo/energy proximity (30% weight) - closer energyNorm = better
+  const energyDiff = Math.abs(currentTrack.energyNorm - candidate.energyNorm);
+  const maxEnergy = 60; // normalize range
+  score += Math.max(0, 30 - (energyDiff / maxEnergy) * 30);
+
+  // 3. DNA similarity (20% weight)
+  score += (candidate.similarity / 100) * 20;
+
+  // 4. Hit potential (10% weight) - higher dhsScore = bonus
+  score += Math.min(candidate.dhsScore / 50, 1) * 10;
+
+  const matchedGenre = currentGenres.find((g) => candidateGenres.includes(g)) || candidateGenres[0] || "";
+
+  return { score, genreMatch, genreLabel: matchedGenre, energyDiff };
+}
 
 export default function DiscoverPage() {
   const [chain, setChain] = useState<ChainTrack[]>([]);
@@ -162,10 +223,11 @@ export default function DiscoverPage() {
         similarity: "Seed",
         genre: seed.genre,
         dhsScore: seed.dhsScore,
+        energyNorm: seed.energyNorm ?? 0,
         appleId: seed.appleId,
       };
 
-      // Fetch similars for seed
+      // Fetch similars for seed and score them musically
       const simRes = await fetch(`/api/dna/similars?id=${seed.id}&limit=50`);
       if (!simRes.ok) {
         setChain([seedTrack]);
@@ -174,20 +236,63 @@ export default function DiscoverPage() {
         return;
       }
       const simData = await simRes.json();
-      const similars: { id: number; artist: string; title: string; similarity: number; genre: string; dhsScore: number; appleId?: number }[] = simData.similars;
+      const similars: SimilarCandidate[] = simData.similars;
 
       if (similars.length > 0) {
-        const top = similars[0];
-        const nextChainTrack: ChainTrack = {
-          id: top.id,
-          title: top.title,
-          artist: top.artist,
-          similarity: `${top.similarity.toFixed(2)}%`,
-          genre: top.genre,
-          dhsScore: top.dhsScore,
-          appleId: top.appleId,
-        };
-        setChain([seedTrack, nextChainTrack]);
+        // Score all candidates using musical DNA matching
+        const scored = similars.map((candidate) => {
+          const result = scoreCandidate(candidate, seedTrack, activeGenre);
+          return { candidate, ...result };
+        });
+
+        // Sort by score descending, pick the best
+        scored.sort((a, b) => b.score - a.score);
+        const best = scored[0];
+
+        if (best && best.score > 0) {
+          const nextChainTrack: ChainTrack = {
+            id: best.candidate.id,
+            title: best.candidate.title,
+            artist: best.candidate.artist,
+            similarity: `${best.candidate.similarity.toFixed(2)}%`,
+            genre: best.candidate.genre,
+            dhsScore: best.candidate.dhsScore,
+            energyNorm: best.candidate.energyNorm ?? 0,
+            appleId: best.candidate.appleId,
+            scoreBreakdown: {
+              genreMatch: best.genreMatch,
+              genreLabel: best.genreLabel,
+              energyDiff: best.energyDiff,
+              dnaSimilarity: best.candidate.similarity,
+              hitScore: best.candidate.dhsScore,
+              totalScore: best.score,
+            },
+          };
+          setChain([seedTrack, nextChainTrack]);
+        } else {
+          // Fallback: just pick first similar if scoring yields nothing
+          const top = similars[0];
+          const fallbackResult = scoreCandidate(top, seedTrack, null);
+          const nextChainTrack: ChainTrack = {
+            id: top.id,
+            title: top.title,
+            artist: top.artist,
+            similarity: `${top.similarity.toFixed(2)}%`,
+            genre: top.genre,
+            dhsScore: top.dhsScore,
+            energyNorm: top.energyNorm ?? 0,
+            appleId: top.appleId,
+            scoreBreakdown: {
+              genreMatch: fallbackResult.genreMatch,
+              genreLabel: fallbackResult.genreLabel,
+              energyDiff: fallbackResult.energyDiff,
+              dnaSimilarity: top.similarity,
+              hitScore: top.dhsScore,
+              totalScore: fallbackResult.score,
+            },
+          };
+          setChain([seedTrack, nextChainTrack]);
+        }
       } else {
         setChain([seedTrack]);
       }
@@ -199,33 +304,71 @@ export default function DiscoverPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [play]);
+  }, [play, activeGenre]);
 
-  const fetchNextForTrack = useCallback(async (trackId: number, existingIds: Set<number>, genreFilter: string | null) => {
+  const fetchNextForTrack = useCallback(async (track: ChainTrack, existingIds: Set<number>, genreFilter: string | null) => {
     setIsFetchingNext(true);
     try {
-      const res = await fetch(`/api/dna/similars?id=${trackId}&limit=50`);
+      const res = await fetch(`/api/dna/similars?id=${track.id}&limit=50`);
       if (!res.ok) return null;
       const data = await res.json();
-      let similars: { id: number; artist: string; title: string; similarity: number; genre: string; dhsScore: number; appleId?: number }[] = data.similars;
+      const similars: SimilarCandidate[] = data.similars;
 
-      // Apply genre filter if active (Feature #16)
-      if (genreFilter) {
-        similars = similars.filter((s) => s.genre.includes(genreFilter));
+      // Score all candidates using musical DNA matching
+      const scored = similars
+        .filter((s) => !existingIds.has(s.id))
+        .map((candidate) => {
+          const result = scoreCandidate(candidate, track, genreFilter);
+          return { candidate, ...result };
+        });
+
+      // Sort by score descending
+      scored.sort((a, b) => b.score - a.score);
+
+      // Pick the top scored candidate
+      const best = scored.find((s) => s.score > 0);
+      if (!best) {
+        // Fallback: pick any candidate not in chain, ignoring genre filter
+        const fallback = similars.find((s) => !existingIds.has(s.id));
+        if (!fallback) return null;
+        const fallbackResult = scoreCandidate(fallback, track, null);
+        return {
+          id: fallback.id,
+          title: fallback.title,
+          artist: fallback.artist,
+          similarity: `${fallback.similarity.toFixed(2)}%`,
+          genre: fallback.genre,
+          dhsScore: fallback.dhsScore,
+          energyNorm: fallback.energyNorm ?? 0,
+          appleId: fallback.appleId,
+          scoreBreakdown: {
+            genreMatch: fallbackResult.genreMatch,
+            genreLabel: fallbackResult.genreLabel,
+            energyDiff: fallbackResult.energyDiff,
+            dnaSimilarity: fallback.similarity,
+            hitScore: fallback.dhsScore,
+            totalScore: fallbackResult.score,
+          },
+        } as ChainTrack;
       }
 
-      // Pick the top neighbor not already in chain
-      const next = similars.find((s) => !existingIds.has(s.id));
-      if (!next) return null;
-
       return {
-        id: next.id,
-        title: next.title,
-        artist: next.artist,
-        similarity: `${next.similarity.toFixed(2)}%`,
-        genre: next.genre,
-        dhsScore: next.dhsScore,
-        appleId: next.appleId,
+        id: best.candidate.id,
+        title: best.candidate.title,
+        artist: best.candidate.artist,
+        similarity: `${best.candidate.similarity.toFixed(2)}%`,
+        genre: best.candidate.genre,
+        dhsScore: best.candidate.dhsScore,
+        energyNorm: best.candidate.energyNorm ?? 0,
+        appleId: best.candidate.appleId,
+        scoreBreakdown: {
+          genreMatch: best.genreMatch,
+          genreLabel: best.genreLabel,
+          energyDiff: best.energyDiff,
+          dnaSimilarity: best.candidate.similarity,
+          hitScore: best.candidate.dhsScore,
+          totalScore: best.score,
+        },
       } as ChainTrack;
     } catch {
       return null;
@@ -253,7 +396,7 @@ export default function DiscoverPage() {
 
     // Fetch a new track to append (infinite chaining)
     const existingIds = new Set(chain.map((t) => t.id));
-    const newTrack = await fetchNextForTrack(nextT.id, existingIds, activeGenre);
+    const newTrack = await fetchNextForTrack(nextT, existingIds, activeGenre);
     if (newTrack) {
       setChain((prev) => [...prev, newTrack]);
     }
@@ -498,12 +641,13 @@ export default function DiscoverPage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-purple-400 font-medium truncate">{result.artist}</p>
                     <h4 className="text-[11px] font-medium text-white truncate">{result.title}</h4>
-                    <p className="text-[9px] text-text-muted truncate">{result.artist}</p>
-                  </div>
-                  <div className="shrink-0 flex items-center gap-1.5">
-                    <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-white/5 text-text-muted/60">{result.genre.split(",")[0]}</span>
-                    <span className="text-[9px] font-mono text-blue-400">Hit: {result.dhsScore}%</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-white/5 text-text-muted/60">{result.genre.split(",")[0]}</span>
+                      <span className="text-[8px] font-mono text-orange-400/70">Tempo: {result.energyNorm ?? "N/A"}</span>
+                      <span className="text-[8px] font-mono text-blue-400/70">Hit: {result.dhsScore}%</span>
+                    </div>
                   </div>
                 </button>
               ))}
@@ -572,11 +716,12 @@ export default function DiscoverPage() {
             <h2 className="text-sm font-bold text-white">{currentTrack.title}</h2>
             <p className="text-[11px] text-text-muted mt-0.5">{currentTrack.artist}</p>
 
-            {/* Genre + Hit Score */}
+            {/* Genre + Tempo + Hit Score */}
             <div className="flex items-center gap-1.5 mt-1.5">
               <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted/70">
                 {currentTrack.genre.split(",")[0]}
               </span>
+              <span className="text-[9px] font-mono text-orange-400">Tempo: {currentTrack.energyNorm}</span>
               <span className="text-[9px] font-mono text-blue-400">Hit: {currentTrack.dhsScore}%</span>
               {currentTrack.appleId && (
                 <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400">
@@ -636,27 +781,45 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      {/* "Why this song?" explainer (Feature #17) */}
+      {/* "Why this song?" explainer (Feature #17) - REAL reasons */}
       {showWhy && currentIndex > 0 && currentTrack && (
         <div className="bg-white/5 rounded-xl p-3 text-[10px]">
-          <p className="text-text-muted">
-            This track was selected because its DNA profile is{" "}
-            <span className="text-white font-mono">{currentTrack.similarity}</span>{" "}
-            similar to the previous track
+          <p className="text-text-muted font-medium mb-2">
+            Why this track was selected:
           </p>
-          <ul className="mt-2 space-y-1 text-text-muted/70">
+          <ul className="space-y-1.5 text-text-muted/80">
+            {currentTrack.scoreBreakdown?.genreMatch && (
+              <li className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                <span>Genre match: <span className="text-white font-medium capitalize">{currentTrack.scoreBreakdown.genreLabel}</span></span>
+              </li>
+            )}
             <li className="flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-purple-400" />
-              High bass presence
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+              <span>
+                Similar tempo:{" "}
+                <span className="text-white font-mono">{currentTrack.energyNorm}</span>
+                {currentIndex > 0 && chain[currentIndex - 1] && (
+                  <span className="text-text-muted/50">
+                    {" "}(prev: {chain[currentIndex - 1].energyNorm}, diff: {Math.abs(currentTrack.energyNorm - chain[currentIndex - 1].energyNorm).toFixed(1)})
+                  </span>
+                )}
+              </span>
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-blue-400" />
-              Similar tempo range
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span>Hit score: <span className="text-white font-mono">{currentTrack.dhsScore}%</span></span>
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-green-400" />
-              Matching chord progression
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              <span>DNA proximity: <span className="text-white font-mono">{currentTrack.similarity}</span></span>
             </li>
+            {currentTrack.scoreBreakdown && (
+              <li className="flex items-center gap-1.5 mt-1 pt-1 border-t border-white/5">
+                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                <span>Total DJ score: <span className="text-white font-mono">{currentTrack.scoreBreakdown.totalScore.toFixed(1)}/100</span></span>
+              </li>
+            )}
           </ul>
         </div>
       )}
@@ -720,6 +883,7 @@ export default function DiscoverPage() {
           </div>
           <div className="flex items-center gap-2 mt-1.5 pl-11.5">
             <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-white/5 text-text-muted/60">{nextTrack.genre.split(",")[0]}</span>
+            <span className="text-[8px] font-mono text-orange-400/70">Tempo: {nextTrack.energyNorm}</span>
             <span className="text-[9px] font-mono text-blue-400/70">Hit: {nextTrack.dhsScore}%</span>
             {nextTrack.appleId && (
               <span className="text-[8px] text-green-400/60">Preview available</span>
@@ -775,6 +939,7 @@ export default function DiscoverPage() {
                   <div className="flex items-center gap-1.5">
                     <p className="text-[9px] text-text-muted/50 truncate">{track.artist}</p>
                     <span className="text-[8px] px-1 py-0 rounded bg-white/5 text-text-muted/40">{track.genre.split(",")[0]}</span>
+                    <span className="text-[8px] font-mono text-orange-400/40">T:{track.energyNorm}</span>
                     <span className="text-[8px] font-mono text-blue-400/50">Hit: {track.dhsScore}%</span>
                   </div>
                 </div>
