@@ -6,7 +6,7 @@ export default function AppHome() {
       {/* Greeting */}
       <div>
         <h1 className="text-xl font-bold">Welcome back</h1>
-        <p className="text-text-muted text-xs mt-0.5">AI-powered music intelligence</p>
+        <p className="text-text-muted text-xs mt-0.5">Your AI DJ is always spinning</p>
       </div>
 
       {/* Primary CTA — Analyze a Song */}
@@ -72,8 +72,8 @@ export default function AppHome() {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-xs font-bold">Discover by Sound DNA</h3>
-            <p className="text-[10px] text-text-muted/50">Find songs that actually sound like yours</p>
+            <h3 className="text-xs font-bold">DJ Mode</h3>
+            <p className="text-[10px] text-text-muted/50">Let AI chain songs by DNA</p>
           </div>
           <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-text-muted/30 shrink-0">
             <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -119,12 +119,12 @@ export default function AppHome() {
 
       {/* Trending — horizontal scroll */}
       <div>
-        <h2 className="text-sm font-bold mb-2">Trending Now</h2>
+        <h2 className="text-sm font-bold mb-2">Currently Spinning</h2>
         <div className="flex gap-2 overflow-x-auto -mx-5 px-5">
           {[
-            { title: "Scarface", artist: "Zeeky", score: "89%", tag: "Hot" },
+            { title: "Scarface", artist: "Zeeky", score: "89%", tag: "Now Playing" },
             { title: "Gold", artist: "Zeeky", score: "81%", tag: "Rising" },
-            { title: "Pull Up Wit Ah Stick", artist: "SahBabii", score: "95%", tag: "Hit" },
+            { title: "Pull Up Wit Ah Stick", artist: "SahBabii", score: "95%", tag: "Up Next" },
           ].map((track) => (
             <div key={track.title} className="min-w-[130px] bg-surface border border-white/5 rounded-xl p-2.5 shrink-0">
               <div className="w-full aspect-[4/3] rounded-lg bg-gradient-to-br from-accent-purple/20 to-accent-blue/20 flex items-center justify-center mb-1.5">
@@ -139,6 +139,29 @@ export default function AppHome() {
                 <span className="text-[10px] font-mono text-green-400">{track.score}</span>
                 <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-accent-purple/10 text-accent-purple">{track.tag}</span>
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div>
+        <h2 className="text-sm font-bold mb-2">Recent Activity</h2>
+        <div className="space-y-2">
+          {[
+            { action: "DJ chained", track: "Scarface → Pull Up Wit Ah Stick", time: "2h ago", result: "89.12% proximity" },
+            { action: "New artist found", track: "SahBabii via DNA", time: "4h ago", result: "Auto-discovered" },
+            { action: "Playlist saved", track: "DNA Chain Mix (12 tracks)", time: "1d ago", result: "From Scarface seed" },
+          ].map((item) => (
+            <div key={item.track} className="bg-surface border border-white/5 rounded-xl p-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-accent-purple font-medium uppercase">{item.action}</span>
+                  <span className="text-[9px] text-text-muted/40">{item.time}</span>
+                </div>
+                <p className="text-xs font-semibold truncate mt-0.5">{item.track}</p>
+              </div>
+              <span className="text-[10px] text-green-400 font-mono shrink-0">{item.result}</span>
             </div>
           ))}
         </div>

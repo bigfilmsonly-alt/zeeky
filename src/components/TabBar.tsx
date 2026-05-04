@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 /* ─── /app tabs ─── */
 const appTabs = [
   { label: "Home", href: "/app" },
-  { label: "Discover", href: "/app/discover" },
+  { label: "DJ", href: "/app/discover" },
   { label: "Studio", href: "/app/studio" },
   { label: "Live", href: "/app/live" },
   { label: "Profile", href: "/app/profile" },
