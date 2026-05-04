@@ -35,33 +35,33 @@ const topCities = [
 
 const proximityResultsScarface = [
   { song: "Scarface", artist: "Zeeky", proximity: 100.0, isSelf: true },
-  { song: "Pull Up Wit Ah Stick", artist: "SahBabii", proximity: 89.12, isSelf: false },
-  { song: "Patek Water", artist: "Future ft Young Thug", proximity: 87.45, isSelf: false },
-  { song: "Having Our Way", artist: "Migos ft Drake", proximity: 85.86, isSelf: false },
-  { song: "Said Sum", artist: "Moneybagg Yo", proximity: 84.2, isSelf: false },
-  { song: "Golden Child", artist: "Lil Durk", proximity: 82.91, isSelf: false },
-  { song: "What Happened To Virgil", artist: "Lil Durk ft Gunna", proximity: 81.55, isSelf: false },
-  { song: "Wunna", artist: "Gunna ft Young Thug", proximity: 80.12, isSelf: false },
-  { song: "Money Trees", artist: "Kendrick Lamar", proximity: 78.34, isSelf: false },
-  { song: "Rockstar", artist: "DaBaby ft Roddy Ricch", proximity: 76.89, isSelf: false },
+  { song: "Harlem Shake", artist: "Future ft Young Thug", proximity: 87.0, isSelf: false },
+  { song: "Having Our Way", artist: "Migos ft Drake", proximity: 86.12, isSelf: false },
+  { song: "Golden Child", artist: "Lil Durk", proximity: 85.93, isSelf: false },
+  { song: "Said Sum", artist: "Moneybagg Yo", proximity: 85.02, isSelf: false },
+  { song: "What Happened To Virgil", artist: "Lil Durk ft Gunna", proximity: 84.82, isSelf: false },
+  { song: "Mop", artist: "Gunna ft Young Thug", proximity: 84.82, isSelf: false },
+  { song: "Sup Mate", artist: "Young Thug ft Future", proximity: 84.76, isSelf: false },
+  { song: "Poochie Gown", artist: "Gunna", proximity: 84.67, isSelf: false },
+  { song: "I'm The Plug", artist: "Drake & Future", proximity: 84.32, isSelf: false },
 ];
 
 const proximityResultsGold = [
   { song: "Gold", artist: "Zeeky", proximity: 100.0, isSelf: true },
-  { song: "Essence", artist: "Wizkid ft Tems", proximity: 86.34, isSelf: false },
-  { song: "Come Closer", artist: "Drake ft Wizkid", proximity: 84.77, isSelf: false },
-  { song: "Peru", artist: "Fireboy DML", proximity: 82.15, isSelf: false },
-  { song: "Love Nwantiti", artist: "CKay", proximity: 80.62, isSelf: false },
-  { song: "Calm Down", artist: "Rema", proximity: 78.93, isSelf: false },
-  { song: "Last Last", artist: "Burna Boy", proximity: 77.41, isSelf: false },
-  { song: "Mood", artist: "24kGoldn ft iann dior", proximity: 75.88, isSelf: false },
-  { song: "Stay", artist: "The Kid LAROI ft Justin Bieber", proximity: 74.22, isSelf: false },
-  { song: "Levitating", artist: "Dua Lipa ft DaBaby", proximity: 72.56, isSelf: false },
+  { song: "Praise The Lord (Da Shine)", artist: "A$AP Rocky ft Skepta", proximity: 94.72, isSelf: false },
+  { song: "Walk Em Down", artist: "Metro Boomin & 21 Savage", proximity: 94.52, isSelf: false },
+  { song: "War Bout It", artist: "Lil Durk ft 21 Savage", proximity: 94.27, isSelf: false },
+  { song: "Love Sosa", artist: "Chief Keef", proximity: 94.09, isSelf: false },
+  { song: "Better", artist: "Khalid", proximity: 93.79, isSelf: false },
+  { song: "U-Digg", artist: "Lil Baby, 42 Dugg & Veeze", proximity: 93.66, isSelf: false },
+  { song: "Split", artist: "Yeat", proximity: 93.53, isSelf: false },
+  { song: "Poland", artist: "Lil Yachty", proximity: 93.43, isSelf: false },
+  { song: "Liability", artist: "Drake", proximity: 93.3, isSelf: false },
 ];
 
 export default function StudioPage() {
   const [activeTrack, setActiveTrack] = useState<"scarface" | "gold">("scarface");
-  const score = activeTrack === "scarface" ? 89 : 81;
+  const score = activeTrack === "scarface" ? 86.76 : 80.96;
 
   return (
     <div className="space-y-5">
@@ -125,7 +125,7 @@ export default function StudioPage() {
             </defs>
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-lg font-bold">{score}%</span>
+            <span className="text-lg font-bold">{score.toFixed(1)}%</span>
           </div>
         </div>
         <p className="text-xs text-green-400 font-medium">{score >= 85 ? "High Hit Potential" : "Strong Potential"}</p>

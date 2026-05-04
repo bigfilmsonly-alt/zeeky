@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findSimilarSongs } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -5,29 +5,29 @@ import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useRef } from "react";
 
 const scarfaceResults = [
-  { rank: 1, artist: "Future ft Young Thug", song: "Patek Water", correlation: "89.12%" },
-  { rank: 2, artist: "Migos ft Drake", song: "Having Our Way", correlation: "88.12%" },
-  { rank: 3, artist: "Lil Durk", song: "Golden Child", correlation: "85.86%" },
-  { rank: 4, artist: "Moneybagg Yo", song: "Said Sum", correlation: "85.80%" },
-  { rank: 5, artist: "Lil Durk ft Gunna", song: "What Happened To Virgil", correlation: "84.90%" },
-  { rank: 6, artist: "Gunna ft Young Thug", song: "Wunna", correlation: "84.85%" },
-  { rank: 7, artist: "Young Thug ft Future", song: "Sup Mate", correlation: "84.80%" },
-  { rank: 8, artist: "Gunna", song: "Spending Addiction", correlation: "84.70%" },
-  { rank: 9, artist: "Drake ft Future", song: "I'm The Plug", correlation: "84.50%" },
-  { rank: 10, artist: "Travis Scott", song: "NC-17", correlation: "84.45%" },
+  { rank: 1, artist: "Future ft Young Thug", song: "Harlem Shake", correlation: "87.00%" },
+  { rank: 2, artist: "Migos ft Drake", song: "Having Our Way", correlation: "86.12%" },
+  { rank: 3, artist: "Lil Durk", song: "Golden Child", correlation: "85.93%" },
+  { rank: 4, artist: "Moneybagg Yo", song: "Said Sum", correlation: "85.02%" },
+  { rank: 5, artist: "Lil Durk ft Gunna", song: "What Happened To Virgil", correlation: "84.82%" },
+  { rank: 6, artist: "Gunna ft Young Thug", song: "Mop", correlation: "84.82%" },
+  { rank: 7, artist: "Young Thug ft Future", song: "Sup Mate", correlation: "84.76%" },
+  { rank: 8, artist: "Gunna", song: "Poochie Gown", correlation: "84.67%" },
+  { rank: 9, artist: "Drake & Future", song: "I'm The Plug", correlation: "84.32%" },
+  { rank: 10, artist: "Travis Scott", song: "NC-17", correlation: "84.14%" },
 ];
 
 const goldResults = [
-  { rank: 1, artist: "Harry Styles", song: "Golden", correlation: "80.50%" },
-  { rank: 2, artist: "Billie Eilish", song: "All Good Girls Go to Hell", correlation: "79.65%" },
-  { rank: 3, artist: "Bad Bunny", song: "I Need to Know the Artist", correlation: "78.70%" },
-  { rank: 4, artist: "Biliar", song: "Soul State", correlation: "77.15%" },
-  { rank: 5, artist: "Billie Eilish", song: "I Didn't Change My Number", correlation: "75.85%" },
-  { rank: 6, artist: "Billie Eilish", song: "Getting Older", correlation: "74.90%" },
-  { rank: 7, artist: "Harry Styles", song: "Daydream", correlation: "73.55%" },
-  { rank: 8, artist: "Billie Eilish", song: "Goldwing", correlation: "73.30%" },
-  { rank: 9, artist: "Harry Styles", song: "Sunflower", correlation: "72.80%" },
-  { rank: 10, artist: "Charlie Harding ft Leighton Meester", song: "Close to U, Mr.", correlation: "72.50%" },
+  { rank: 1, artist: "A$AP Rocky ft Skepta", song: "Praise The Lord (Da Shine)", correlation: "94.72%" },
+  { rank: 2, artist: "Metro Boomin & 21 Savage", song: "Walk Em Down", correlation: "94.52%" },
+  { rank: 3, artist: "Lil Durk ft 21 Savage", song: "War Bout It", correlation: "94.27%" },
+  { rank: 4, artist: "Chief Keef", song: "Love Sosa", correlation: "94.09%" },
+  { rank: 5, artist: "Khalid", song: "Better", correlation: "93.79%" },
+  { rank: 6, artist: "Lil Baby, 42 Dugg & Veeze", song: "U-Digg", correlation: "93.66%" },
+  { rank: 7, artist: "Yeat", song: "Split", correlation: "93.53%" },
+  { rank: 8, artist: "Lil Yachty", song: "Poland", correlation: "93.43%" },
+  { rank: 9, artist: "Drake", song: "Liability", correlation: "93.30%" },
+  { rank: 10, artist: "Corinne Bailey Rae", song: "Like A Star", correlation: "69.80%" },
 ];
 
 const radarArtists = [
