@@ -55,6 +55,8 @@ export default function DiscoverPage() {
 
   // Save Playlist state
   const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
+  const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
 
   // Genre filtering state (Feature #16)
   const [genres, setGenres] = useState<GenreItem[]>([]);
@@ -286,8 +288,9 @@ export default function DiscoverPage() {
     if (chain.length === 0 || saveState === "saved") return;
 
     const seedTrack = chain[0];
+    const playlistId = crypto.randomUUID();
     const playlist: SavedPlaylist = {
-      id: crypto.randomUUID(),
+      id: playlistId,
       name: `DJ Chain - ${seedTrack.title}`,
       tracks: [...chain],
       createdAt: new Date().toISOString(),
@@ -299,9 +302,31 @@ export default function DiscoverPage() {
     existing.push(playlist);
     localStorage.setItem("zeeky_playlists", JSON.stringify(existing));
 
+    setLastSavedId(playlistId);
     setSaveState("saved");
-    setTimeout(() => setSaveState("idle"), 2000);
+    setTimeout(() => setSaveState("idle"), 4000);
   }, [chain, saveState]);
+
+  // Copy link handler
+  const handleCopyLink = useCallback(async () => {
+    if (!lastSavedId) return;
+    const url = `${window.location.origin}/app/chain/${lastSavedId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    }
+  }, [lastSavedId]);
 
   // Pull-to-refresh handlers
   const handlePullRefresh = useCallback(async () => {
@@ -807,6 +832,37 @@ export default function DiscoverPage() {
           {saveState === "saved" ? "\u2713 Saved!" : "Save Playlist"}
         </button>
       </div>
+
+      {/* Copy Link confirmation */}
+      {saveState === "saved" && lastSavedId && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={handleCopyLink}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all active:scale-[0.97] ${
+              copyFeedback
+                ? "bg-green-600/20 border border-green-500/30 text-green-400"
+                : "bg-white/5 border border-white/10 text-text-muted hover:text-white"
+            }`}
+          >
+            {copyFeedback ? (
+              <>
+                <svg viewBox="0 0 24 24" fill="none" className="w-3 h-3">
+                  <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" fill="none" className="w-3 h-3">
+                  <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+                Copy Link
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

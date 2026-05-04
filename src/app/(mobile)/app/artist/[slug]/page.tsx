@@ -1,163 +1,325 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 /* ------------------------------------------------------------------ */
-/*  Hardcoded artist data                                             */
+/*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-const artists: Record<
-  string,
-  {
-    name: string;
-    initials: string;
-    gradient: string;
-    genres: string[];
-    dna: { tempo: number; bass: number; melody: number; chord: number; energy: number };
-    similar: { slug: string; name: string; initials: string; gradient: string }[];
-    topMatches: { title: string; artist: string; score: number }[];
-    stats: { streams: string; tracks: string; matches: string };
+interface SongResult {
+  id: number;
+  artist: string;
+  title: string;
+  year: number;
+  genre: string;
+  peak: number;
+  weeks: number;
+  rank: number;
+  dhsScore: number;
+  energyTotal: number;
+  energyNorm: number;
+}
+
+interface SimilarSong {
+  id: number;
+  artist: string;
+  title: string;
+  year: number;
+  genre: string;
+  peak: number;
+  similarity: number;
+  dhsScore: number;
+}
+
+interface ArtistProfile {
+  name: string;
+  initials: string;
+  genres: string[];
+  tracks: number;
+  avgDhsScore: number;
+  avgEnergy: number;
+  songs: SongResult[];
+  similarArtists: { slug: string; name: string; initials: string }[];
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+const gradients = [
+  "from-purple-500 to-blue-500",
+  "from-blue-600 to-cyan-500",
+  "from-red-600 to-orange-500",
+  "from-green-500 to-emerald-400",
+  "from-amber-500 to-red-500",
+  "from-pink-500 to-rose-400",
+  "from-indigo-500 to-purple-400",
+  "from-teal-500 to-cyan-400",
+];
+
+function getGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-> = {
-  drake: {
-    name: "Drake",
-    initials: "DK",
-    gradient: "from-purple-500 to-blue-500",
-    genres: ["Hip Hop", "R&B", "Pop"],
-    dna: { tempo: 72, bass: 80, melody: 88, chord: 82, energy: 68 },
-    similar: [
-      { slug: "future", name: "Future", initials: "FT", gradient: "from-blue-600 to-cyan-500" },
-      { slug: "21-savage", name: "21 Savage", initials: "21", gradient: "from-red-600 to-orange-500" },
-      { slug: "lil-baby", name: "Lil Baby", initials: "LB", gradient: "from-green-500 to-emerald-400" },
-      { slug: "travis-scott", name: "Travis Scott", initials: "TS", gradient: "from-amber-500 to-red-500" },
-    ],
-    topMatches: [
-      { title: "Patek Water", artist: "Future ft Young Thug", score: 92 },
-      { title: "Scarface", artist: "Zeeky", score: 89 },
-      { title: "Having Our Way", artist: "Migos ft Drake", score: 88 },
-    ],
-    stats: { streams: "82.4B", tracks: "342", matches: "1.2K" },
-  },
-  future: {
-    name: "Future",
-    initials: "FT",
-    gradient: "from-blue-600 to-cyan-500",
-    genres: ["Trap", "Hip Hop", "R&B"],
-    dna: { tempo: 84, bass: 94, melody: 62, chord: 70, energy: 88 },
-    similar: [
-      { slug: "drake", name: "Drake", initials: "DK", gradient: "from-purple-500 to-blue-500" },
-      { slug: "21-savage", name: "21 Savage", initials: "21", gradient: "from-red-600 to-orange-500" },
-      { slug: "travis-scott", name: "Travis Scott", initials: "TS", gradient: "from-amber-500 to-red-500" },
-      { slug: "lil-baby", name: "Lil Baby", initials: "LB", gradient: "from-green-500 to-emerald-400" },
-    ],
-    topMatches: [
-      { title: "Patek Water", artist: "Future ft Young Thug", score: 95 },
-      { title: "Wunna", artist: "Gunna ft Young Thug", score: 90 },
-      { title: "Said Sum", artist: "Moneybagg Yo", score: 86 },
-    ],
-    stats: { streams: "28.1B", tracks: "287", matches: "980" },
-  },
-  "travis-scott": {
-    name: "Travis Scott",
-    initials: "TS",
-    gradient: "from-amber-500 to-red-500",
-    genres: ["Hip Hop", "Trap", "Psychedelic"],
-    dna: { tempo: 78, bass: 90, melody: 74, chord: 68, energy: 92 },
-    similar: [
-      { slug: "drake", name: "Drake", initials: "DK", gradient: "from-purple-500 to-blue-500" },
-      { slug: "future", name: "Future", initials: "FT", gradient: "from-blue-600 to-cyan-500" },
-      { slug: "21-savage", name: "21 Savage", initials: "21", gradient: "from-red-600 to-orange-500" },
-      { slug: "lil-baby", name: "Lil Baby", initials: "LB", gradient: "from-green-500 to-emerald-400" },
-    ],
-    topMatches: [
-      { title: "Scarface", artist: "Zeeky", score: 91 },
-      { title: "Golden Child", artist: "Lil Durk", score: 87 },
-      { title: "Said Sum", artist: "Moneybagg Yo", score: 84 },
-    ],
-    stats: { streams: "35.6B", tracks: "198", matches: "870" },
-  },
-  "21-savage": {
-    name: "21 Savage",
-    initials: "21",
-    gradient: "from-red-600 to-orange-500",
-    genres: ["Hip Hop", "Trap", "Drill"],
-    dna: { tempo: 68, bass: 92, melody: 55, chord: 60, energy: 85 },
-    similar: [
-      { slug: "drake", name: "Drake", initials: "DK", gradient: "from-purple-500 to-blue-500" },
-      { slug: "future", name: "Future", initials: "FT", gradient: "from-blue-600 to-cyan-500" },
-      { slug: "lil-baby", name: "Lil Baby", initials: "LB", gradient: "from-green-500 to-emerald-400" },
-      { slug: "travis-scott", name: "Travis Scott", initials: "TS", gradient: "from-amber-500 to-red-500" },
-    ],
-    topMatches: [
-      { title: "What Happened To Virgil", artist: "Lil Durk ft Gunna", score: 93 },
-      { title: "Golden Child", artist: "Lil Durk", score: 88 },
-      { title: "Wunna", artist: "Gunna ft Young Thug", score: 85 },
-    ],
-    stats: { streams: "19.7B", tracks: "156", matches: "720" },
-  },
-  "lil-baby": {
-    name: "Lil Baby",
-    initials: "LB",
-    gradient: "from-green-500 to-emerald-400",
-    genres: ["Hip Hop", "Trap", "R&B"],
-    dna: { tempo: 76, bass: 88, melody: 70, chord: 74, energy: 82 },
-    similar: [
-      { slug: "drake", name: "Drake", initials: "DK", gradient: "from-purple-500 to-blue-500" },
-      { slug: "future", name: "Future", initials: "FT", gradient: "from-blue-600 to-cyan-500" },
-      { slug: "21-savage", name: "21 Savage", initials: "21", gradient: "from-red-600 to-orange-500" },
-      { slug: "travis-scott", name: "Travis Scott", initials: "TS", gradient: "from-amber-500 to-red-500" },
-    ],
-    topMatches: [
-      { title: "Said Sum", artist: "Moneybagg Yo", score: 91 },
-      { title: "Having Our Way", artist: "Migos ft Drake", score: 87 },
-      { title: "Patek Water", artist: "Future ft Young Thug", score: 84 },
-    ],
-    stats: { streams: "24.3B", tracks: "210", matches: "850" },
-  },
-};
-
-const dnaLabels: Record<string, string> = {
-  tempo: "Tempo",
-  bass: "Bass Presence",
-  melody: "Melody Variation",
-  chord: "Chord Progression",
-  energy: "Spectral Energy",
-};
-
-/* ------------------------------------------------------------------ */
-/*  Static generation                                                 */
-/* ------------------------------------------------------------------ */
-
-export async function generateStaticParams() {
-  return Object.keys(artists).map((slug) => ({ slug }));
+  return gradients[Math.abs(hash) % gradients.length];
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  const artist = artists[slug];
-  if (!artist) return { title: "Artist Not Found | Zeeky" };
-  return {
-    title: `${artist.name} - Sound DNA Profile | Zeeky`,
-    description: `Explore ${artist.name}'s unique sound DNA, similar artists, and top song matches on Zeeky.`,
-  };
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, "-");
+}
+
+function getInitials(name: string): string {
+  return name.slice(0, 2).toUpperCase();
 }
 
 /* ------------------------------------------------------------------ */
-/*  Page component                                                    */
+/*  Page component                                                     */
 /* ------------------------------------------------------------------ */
 
-export default async function ArtistPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const artist = artists[slug];
-  if (!artist) notFound();
+export default function ArtistPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+
+  const [artist, setArtist] = useState<ArtistProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!slug) return;
+
+    let cancelled = false;
+    const decodedSlug = decodeURIComponent(slug);
+
+    async function fetchArtist() {
+      setLoading(true);
+      setNotFound(false);
+
+      try {
+        // Search for songs by this artist
+        const searchRes = await fetch(
+          `/api/dna/search?q=${encodeURIComponent(decodedSlug)}&limit=20`
+        );
+        const searchResults: SongResult[] = await searchRes.json();
+
+        // Filter results to only songs where artist name matches (case-insensitive contains)
+        const artistQuery = decodedSlug.replace(/-/g, " ");
+        const artistSongs = searchResults.filter((song) =>
+          song.artist.toLowerCase().includes(artistQuery.toLowerCase())
+        );
+
+        if (cancelled) return;
+
+        if (artistSongs.length === 0) {
+          setNotFound(true);
+          setLoading(false);
+          return;
+        }
+
+        // Build artist profile from matched songs
+        const artistName = artistSongs[0].artist;
+        const initials = getInitials(artistName);
+
+        // Collect unique genres
+        const genreSet = new Set<string>();
+        for (const song of artistSongs) {
+          for (const g of song.genre.split(",")) {
+            const genre = g.trim();
+            if (genre && genre !== "Music") {
+              genreSet.add(genre);
+            }
+          }
+        }
+
+        // Calculate average dhsScore and energy
+        const avgDhsScore = Math.round(
+          artistSongs.reduce((sum, s) => sum + s.dhsScore, 0) /
+            artistSongs.length
+        );
+        const avgEnergy = Math.round(
+          artistSongs.reduce((sum, s) => sum + s.energyNorm, 0) /
+            artistSongs.length
+        );
+
+        // Sort songs by dhsScore descending for top matches
+        const sortedSongs = [...artistSongs].sort(
+          (a, b) => b.dhsScore - a.dhsScore
+        );
+
+        // Fetch similar artists from the first song
+        let similarArtists: { slug: string; name: string; initials: string }[] =
+          [];
+        try {
+          const similarsRes = await fetch(
+            `/api/dna/similars?id=${artistSongs[0].id}&limit=20`
+          );
+          if (similarsRes.ok) {
+            const similarsData: { song: SongResult; similars: SimilarSong[] } =
+              await similarsRes.json();
+
+            // Group similar songs by artist (excluding current artist)
+            const artistCounts: Record<string, number> = {};
+            for (const sim of similarsData.similars) {
+              if (
+                sim.artist.toLowerCase() !== artistName.toLowerCase()
+              ) {
+                artistCounts[sim.artist] =
+                  (artistCounts[sim.artist] || 0) + 1;
+              }
+            }
+
+            // Top 5 most-appearing artists
+            similarArtists = Object.entries(artistCounts)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 5)
+              .map(([name]) => ({
+                slug: slugify(name),
+                name,
+                initials: getInitials(name),
+              }));
+          }
+        } catch {
+          // Silently ignore similar artists fetch failure
+        }
+
+        if (cancelled) return;
+
+        setArtist({
+          name: artistName,
+          initials,
+          genres: Array.from(genreSet).slice(0, 5),
+          tracks: artistSongs.length,
+          avgDhsScore,
+          avgEnergy,
+          songs: sortedSongs,
+          similarArtists,
+        });
+      } catch {
+        if (!cancelled) {
+          setNotFound(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchArtist();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Loading state                                                    */
+  /* ---------------------------------------------------------------- */
+
+  if (loading) {
+    return (
+      <div className="space-y-5">
+        <div className="inline-flex items-center gap-1 text-text-muted/60 text-[11px]">
+          <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5">
+            <path
+              d="M15 18l-6-6 6-6"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Back
+        </div>
+        <div className="text-center">
+          <div className="w-20 h-20 mx-auto rounded-full bg-white/5 animate-pulse mb-3" />
+          <div className="h-5 w-32 mx-auto bg-white/5 rounded animate-pulse mb-2" />
+          <div className="h-3 w-48 mx-auto bg-white/5 rounded animate-pulse" />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-surface border border-white/5 rounded-xl p-2.5 h-14 animate-pulse"
+            />
+          ))}
+        </div>
+        <div className="bg-surface border border-white/5 rounded-2xl p-4 h-48 animate-pulse" />
+      </div>
+    );
+  }
+
+  /* ---------------------------------------------------------------- */
+  /*  Not found state                                                  */
+  /* ---------------------------------------------------------------- */
+
+  if (notFound || !artist) {
+    return (
+      <div className="space-y-5">
+        <Link
+          href="/app/discover"
+          className="inline-flex items-center gap-1 text-text-muted/60 text-[11px] active:text-white transition-colors"
+        >
+          <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5">
+            <path
+              d="M15 18l-6-6 6-6"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Back
+        </Link>
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto rounded-full bg-white/5 flex items-center justify-center mb-3">
+            <span className="text-2xl text-text-muted/40">?</span>
+          </div>
+          <h1 className="text-lg font-bold mb-1">Artist Not Found</h1>
+          <p className="text-xs text-text-muted/60">
+            No songs found for &ldquo;
+            {decodeURIComponent(slug).replace(/-/g, " ")}
+            &rdquo; in the DNA catalog.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------------------------------------------------------- */
+  /*  DNA profile bars                                                 */
+  /* ---------------------------------------------------------------- */
+
+  const dnaData = [
+    { label: "Hit Score", value: artist.avgDhsScore },
+    { label: "Spectral Energy", value: artist.avgEnergy },
+    {
+      label: "Consistency",
+      value:
+        artist.songs.length > 1
+          ? Math.round(
+              100 -
+                (Math.max(...artist.songs.map((s) => s.dhsScore)) -
+                  Math.min(...artist.songs.map((s) => s.dhsScore)))
+            )
+          : 80,
+    },
+    {
+      label: "Chart Performance",
+      value: Math.min(
+        100,
+        Math.round(
+          artist.songs.reduce((sum, s) => sum + Math.min(s.peak, 100), 0) /
+            artist.songs.length
+        )
+      ),
+    },
+  ];
+
+  /* ---------------------------------------------------------------- */
+  /*  Render                                                           */
+  /* ---------------------------------------------------------------- */
 
   return (
     <div className="space-y-5">
@@ -181,9 +343,11 @@ export default async function ArtistPage({
       {/* Artist header */}
       <div className="text-center">
         <div
-          className={`w-20 h-20 mx-auto rounded-full bg-gradient-to-br ${artist.gradient} flex items-center justify-center mb-3`}
+          className={`w-20 h-20 mx-auto rounded-full bg-gradient-to-br ${getGradient(artist.name)} flex items-center justify-center mb-3`}
         >
-          <span className="text-2xl font-bold text-white">{artist.initials}</span>
+          <span className="text-2xl font-bold text-white">
+            {artist.initials}
+          </span>
         </div>
         <h1 className="text-xl font-bold">{artist.name}</h1>
         <div className="flex gap-1.5 justify-center mt-2 flex-wrap">
@@ -201,16 +365,20 @@ export default async function ArtistPage({
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          { label: "Streams", value: artist.stats.streams },
-          { label: "Tracks Analyzed", value: artist.stats.tracks },
-          { label: "DNA Matches", value: artist.stats.matches },
+          { label: "Tracks", value: String(artist.tracks) },
+          { label: "Avg Hit Score", value: `${artist.avgDhsScore}%` },
+          { label: "Avg Energy", value: `${artist.avgEnergy}%` },
         ].map((stat) => (
           <div
             key={stat.label}
             className="bg-surface border border-white/5 rounded-xl p-2.5 text-center"
           >
-            <div className="text-base font-bold gradient-text">{stat.value}</div>
-            <div className="text-[9px] text-text-muted/60 mt-0.5">{stat.label}</div>
+            <div className="text-base font-bold gradient-text">
+              {stat.value}
+            </div>
+            <div className="text-[9px] text-text-muted/60 mt-0.5">
+              {stat.label}
+            </div>
           </div>
         ))}
       </div>
@@ -222,16 +390,18 @@ export default async function ArtistPage({
           Unique audio fingerprint of {artist.name}
         </p>
         <div className="space-y-2.5">
-          {(Object.keys(artist.dna) as (keyof typeof artist.dna)[]).map((key) => (
-            <div key={key}>
+          {dnaData.map((item) => (
+            <div key={item.label}>
               <div className="flex justify-between text-[10px] mb-0.5">
-                <span className="text-text-muted/70">{dnaLabels[key]}</span>
-                <span className="font-mono text-text-muted">{artist.dna[key]}%</span>
+                <span className="text-text-muted/70">{item.label}</span>
+                <span className="font-mono text-text-muted">
+                  {item.value}%
+                </span>
               </div>
               <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-accent-purple to-accent-blue"
-                  style={{ width: `${artist.dna[key]}%` }}
+                  style={{ width: `${item.value}%` }}
                 />
               </div>
             </div>
@@ -240,33 +410,39 @@ export default async function ArtistPage({
       </div>
 
       {/* Similar Artists */}
-      <div>
-        <h2 className="text-sm font-bold mb-2">Similar Artists</h2>
-        <div className="grid grid-cols-2 gap-2">
-          {artist.similar.map((sim) => (
-            <Link
-              key={sim.slug}
-              href={`/app/artist/${sim.slug}`}
-              className="bg-surface border border-white/5 rounded-xl p-3 flex items-center gap-2.5 active:bg-white/[0.03] transition-colors"
-            >
-              <div
-                className={`w-9 h-9 rounded-full bg-gradient-to-br ${sim.gradient} flex items-center justify-center shrink-0`}
+      {artist.similarArtists.length > 0 && (
+        <div>
+          <h2 className="text-sm font-bold mb-2">Similar Artists</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {artist.similarArtists.map((sim) => (
+              <Link
+                key={sim.slug}
+                href={`/app/artist/${sim.slug}`}
+                className="bg-surface border border-white/5 rounded-xl p-3 flex items-center gap-2.5 active:bg-white/[0.03] transition-colors"
               >
-                <span className="text-[10px] font-bold text-white">{sim.initials}</span>
-              </div>
-              <span className="text-xs font-medium truncate">{sim.name}</span>
-            </Link>
-          ))}
+                <div
+                  className={`w-9 h-9 rounded-full bg-gradient-to-br ${getGradient(sim.name)} flex items-center justify-center shrink-0`}
+                >
+                  <span className="text-[10px] font-bold text-white">
+                    {sim.initials}
+                  </span>
+                </div>
+                <span className="text-xs font-medium truncate">
+                  {sim.name}
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Top DNA Matches */}
       <div>
         <h2 className="text-sm font-bold mb-2">Top DNA Matches</h2>
         <div className="space-y-1.5">
-          {artist.topMatches.map((match, i) => (
+          {artist.songs.slice(0, 5).map((song, i) => (
             <div
-              key={match.title}
+              key={song.id}
               className="bg-surface border border-white/5 rounded-xl p-3 flex items-center gap-2.5"
             >
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent-purple/20 to-accent-blue/20 flex items-center justify-center shrink-0">
@@ -275,18 +451,20 @@ export default async function ArtistPage({
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-medium truncate">{match.title}</h4>
-                <p className="text-[10px] text-text-muted/50 truncate">{match.artist}</p>
+                <h4 className="text-xs font-medium truncate">{song.title}</h4>
+                <p className="text-[10px] text-text-muted/50 truncate">
+                  {song.artist}
+                </p>
               </div>
               <div className="text-right shrink-0">
                 <div
                   className={`text-xs font-mono ${
-                    match.score >= 90 ? "text-green-400" : "text-accent-purple"
+                    song.dhsScore >= 90 ? "text-green-400" : "text-accent-purple"
                   }`}
                 >
-                  {match.score}%
+                  Hit: {song.dhsScore}%
                 </div>
-                <div className="text-[9px] text-text-muted/40">match</div>
+                <div className="text-[9px] text-text-muted/40">score</div>
               </div>
             </div>
           ))}
