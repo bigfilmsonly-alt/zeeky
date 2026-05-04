@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -25,18 +26,8 @@ export default function Home() {
       <div className="absolute bottom-1/3 left-1/2 -translate-x-1/2 w-40 h-40 bg-accent-blue/15 rounded-full blur-[70px]" />
 
       {/* Logo */}
-      <div className="relative z-10 mb-3 w-16 h-16">
-        <svg viewBox="0 0 100 100" className="w-full h-full" fill="none">
-          <defs>
-            <linearGradient id="splashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#8b5cf6" />
-              <stop offset="50%" stopColor="#3b82f6" />
-              <stop offset="100%" stopColor="#06b6d4" />
-            </linearGradient>
-          </defs>
-          <path d="M25 20h50L35 50h30L25 80" stroke="url(#splashGrad)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-          <line x1="50" y1="12" x2="50" y2="88" stroke="url(#splashGrad)" strokeWidth="3" strokeLinecap="round" />
-        </svg>
+      <div className="relative z-10 mb-3 w-20 h-20">
+        <Image src="/logo.png" alt="Zeeky" width={80} height={80} className="w-full h-full object-contain" priority />
       </div>
 
       {/* Title */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 
 const sectionIds = ["company", "label", "ai", "results", "technology", "contact"];
 
@@ -85,7 +86,7 @@ export default function Navigation() {
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <a href="#" className="flex items-center gap-3">
-          <ZeekyLogo className="w-8 h-8" />
+          <Image src="/logo.png" alt="Zeeky" width={32} height={32} className="w-8 h-8 object-contain" />
           <span className="text-xl font-bold tracking-wider gradient-text">
             ZEEKY
           </span>
@@ -162,37 +163,3 @@ export default function Navigation() {
   );
 }
 
-function ZeekyLogo({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      className={className}
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#8b5cf6" />
-          <stop offset="100%" stopColor="#3b82f6" />
-        </linearGradient>
-      </defs>
-      {/* Stylized Z mark inspired by the Zeeky presentation logo */}
-      <path
-        d="M25 20h50L35 50h30L25 80"
-        stroke="url(#logoGrad)"
-        strokeWidth="8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="50"
-        y1="15"
-        x2="50"
-        y2="85"
-        stroke="url(#logoGrad)"
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
