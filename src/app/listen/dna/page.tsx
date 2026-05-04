@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import AppleMusicButton from "@/components/AppleMusicButton";
 import AddToPlaylistButton from "@/components/AddToPlaylistButton";
 
-/* ─── Fallback data ─── */
+/* --- Fallback data --- */
 const FALLBACK_SIMILAR_TRACKS = [
   { rank: 1, title: "Scarface", artist: "Zeeky", dna: "87.0" },
   { rank: 2, title: "Harlem Shake", artist: "Future ft Young Thug", dna: "87.0" },
@@ -26,7 +27,7 @@ const FALLBACK_GENRES = [
   { label: "Drill", pct: 7.7, color: "#ef4444" },
 ];
 
-/* ─── Types ─── */
+/* --- Types --- */
 interface SimilarTrack {
   rank: number;
   title: string;
@@ -40,7 +41,12 @@ interface Genre {
   color: string;
 }
 
-/* ─── Skeleton ─── */
+interface SongInfo {
+  title: string;
+  artist: string;
+}
+
+/* --- Skeleton --- */
 function TrackSkeleton() {
   return (
     <div className="flex items-center gap-2.5 py-2 px-2 rounded-lg">
@@ -56,7 +62,7 @@ function TrackSkeleton() {
   );
 }
 
-/* ─── Radar SVG ─── */
+/* --- Radar SVG --- */
 const AXES = ["Tempo", "Bass", "Melody", "Chord", "Spectral"];
 const VALUES = [0.82, 0.91, 0.65, 0.74, 0.88]; // example values for visual
 const CX = 130;
@@ -117,8 +123,12 @@ function RadarChart() {
   );
 }
 
-/* ─── Page ─── */
-export default function DnaPage() {
+/* --- Inner page content (uses useSearchParams) --- */
+function DnaPageContent() {
+  const searchParams = useSearchParams();
+  const songParam = searchParams.get("song");
+
+  const [songInfo, setSongInfo] = useState<SongInfo>({ title: "Scarface", artist: "Zeeky" });
   const [similarTracks, setSimilarTracks] = useState<SimilarTrack[]>(FALLBACK_SIMILAR_TRACKS);
   const [genres] = useState<Genre[]>(FALLBACK_GENRES);
   const [loading, setLoading] = useState(true);
@@ -128,35 +138,69 @@ export default function DnaPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchSimilar() {
+    async function fetchDna() {
+      if (!songParam) {
+        // No song param -- use fallback data
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Use a default song ID — "scarface" as the seed track
-        const res = await fetch("/api/songs/scarface/similar?limit=50");
+        // First, look up the song info so we can show the name
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(songParam)) {
+          // songParam is a UUID -- look up song info via search endpoint
+          const infoRes = await fetch(`/api/songs/search?q=${encodeURIComponent(songParam)}&limit=1`);
+          if (infoRes.ok) {
+            const infoData = await infoRes.json();
+            if (infoData.results && infoData.results.length > 0) {
+              const s = infoData.results[0];
+              if (!cancelled) {
+                setSongInfo({ title: s.title, artist: s.artist || "Unknown" });
+              }
+            }
+          }
+        } else {
+          // songParam is a title string
+          const infoRes = await fetch(`/api/songs/search?q=${encodeURIComponent(songParam)}&limit=1`);
+          if (infoRes.ok) {
+            const infoData = await infoRes.json();
+            if (infoData.results && infoData.results.length > 0) {
+              const s = infoData.results[0];
+              if (!cancelled) {
+                setSongInfo({ title: s.title, artist: s.artist || "Unknown" });
+              }
+            }
+          }
+        }
+
+        // Fetch similar songs using the song param (API handles both UUID and title lookup)
+        const res = await fetch(`/api/songs/${encodeURIComponent(songParam)}/similar?limit=50`);
         if (!res.ok) throw new Error("API unavailable");
         const data = await res.json();
 
         if (!cancelled && data.results && data.results.length > 0) {
           const tracks: SimilarTrack[] = data.results.map(
-            (s: { title: string; artist: string; similarity?: number; dna_score?: number }, i: number) => ({
+            (s: { title: string; artist: string; similarity?: string | number; dna_score?: number }, i: number) => ({
               rank: i + 1,
               title: s.title,
               artist: s.artist,
-              dna: (s.similarity ?? s.dna_score ?? 80 + Math.random() * 10).toFixed(1),
+              dna: typeof s.similarity === "string" ? s.similarity : (s.similarity ?? s.dna_score ?? 80 + Math.random() * 10).toFixed(1),
             })
           );
           setSimilarTracks(tracks);
         }
         // If no results, fallback data stays
       } catch {
-        // API not available — keep fallback data
+        // API not available -- keep fallback data
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    fetchSimilar();
+    fetchDna();
     return () => { cancelled = true; };
-  }, []);
+  }, [songParam]);
 
   const handleSaveAsPlaylist = async () => {
     if (saving || saved) return;
@@ -176,7 +220,7 @@ export default function DnaPage() {
         setSaved(true);
       }
     } catch {
-      // Silently fail — user not authenticated or API unavailable
+      // Silently fail -- user not authenticated or API unavailable
     } finally {
       setSaving(false);
     }
@@ -184,7 +228,7 @@ export default function DnaPage() {
 
   return (
     <div className="px-4 pb-28">
-      {/* ── Headline ── */}
+      {/* -- Headline -- */}
       <div className="pt-2 pb-4">
         <h1 className="text-lg font-bold tracking-tight leading-snug">
           Every song has a signature.
@@ -193,7 +237,7 @@ export default function DnaPage() {
         </h1>
       </div>
 
-      {/* ── Stats row ── */}
+      {/* -- Stats row -- */}
       <div className="flex items-center justify-between gap-2 mb-5">
         {[
           { value: "84", label: "Attributes" },
@@ -207,23 +251,23 @@ export default function DnaPage() {
         ))}
       </div>
 
-      {/* ── Now Analyzing ── */}
+      {/* -- Now Analyzing -- */}
       <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-surface/60 border border-white/[0.04] mb-4">
         <span className="relative flex h-2 w-2 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-purple opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-purple" />
         </span>
         <p className="text-[10px] font-mono text-text-muted/70">
-          Now Analyzing: <span className="text-white font-semibold">Scarface</span> &mdash; by Zeeky
+          Now Analyzing: <span className="text-white font-semibold">{songInfo.title}</span> &mdash; by {songInfo.artist}
         </p>
       </div>
 
-      {/* ── Radar Chart ── */}
+      {/* -- Radar Chart -- */}
       <div className="mb-5">
         <RadarChart />
       </div>
 
-      {/* ── Save as Playlist + Section Header ── */}
+      {/* -- Save as Playlist + Section Header -- */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2.5">
           <h3 className="text-sm font-bold tracking-tight">
@@ -255,7 +299,7 @@ export default function DnaPage() {
           </button>
         </div>
 
-        {/* ── Similar Songs List ── */}
+        {/* -- Similar Songs List -- */}
         <div className="flex flex-col gap-0.5 max-h-[60vh] overflow-y-auto scrollbar-none">
           {loading
             ? Array.from({ length: 10 }).map((_, i) => <TrackSkeleton key={i} />)
@@ -284,7 +328,7 @@ export default function DnaPage() {
         </div>
       </div>
 
-      {/* ── Genre Distribution ── */}
+      {/* -- Genre Distribution -- */}
       <div>
         <h3 className="text-sm font-bold mb-2.5 tracking-tight">Genre Distribution</h3>
         <div className="space-y-2">
@@ -305,5 +349,39 @@ export default function DnaPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* --- Loading fallback for Suspense boundary --- */
+function DnaPageFallback() {
+  return (
+    <div className="px-4 pb-28">
+      <div className="pt-2 pb-4">
+        <div className="h-5 w-48 rounded bg-white/5 animate-pulse mb-2" />
+        <div className="h-5 w-32 rounded bg-white/5 animate-pulse" />
+      </div>
+      <div className="flex items-center justify-between gap-2 mb-5">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex-1 text-center py-2.5 rounded-xl bg-surface border border-white/[0.04]">
+            <div className="h-4 w-10 mx-auto rounded bg-white/5 animate-pulse mb-1" />
+            <div className="h-2.5 w-14 mx-auto rounded bg-white/5 animate-pulse" />
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <TrackSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* --- Page (wraps content in Suspense for useSearchParams) --- */
+export default function DnaPage() {
+  return (
+    <Suspense fallback={<DnaPageFallback />}>
+      <DnaPageContent />
+    </Suspense>
   );
 }

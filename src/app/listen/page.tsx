@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePlayer } from "@/lib/player-context";
-import AppleMusicButton from "@/components/AppleMusicButton";
+import StreamingButtons from "@/components/StreamingButtons";
 import AddToPlaylistButton from "@/components/AddToPlaylistButton";
 
 /* ─── Fallback data (used when API is unavailable) ─── */

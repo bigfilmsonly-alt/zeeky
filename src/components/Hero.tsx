@@ -329,18 +329,18 @@ export default function Hero() {
             variants={buttonContainerVariants}
           >
             <motion.a
-              href="#ai"
-              className="px-6 py-3 text-sm bg-gradient-to-r from-accent-purple to-accent-blue rounded-full text-white font-semibold tracking-wide hover:opacity-90 transition-opacity"
+              href="/search"
+              className="px-8 py-4 text-base bg-gradient-to-r from-accent-purple to-accent-blue rounded-full text-white font-bold tracking-wide hover:opacity-90 transition-opacity glow-purple"
               variants={buttonVariants}
             >
-              Explore the AI
+              Search 9,914 Songs by DNA
             </motion.a>
             <motion.a
-              href="#contact"
+              href="#ai"
               className="px-6 py-3 text-sm border border-white/10 rounded-full text-foreground font-semibold tracking-wide hover:bg-white/5 transition-colors"
               variants={buttonVariants}
             >
-              Get in Touch
+              How It Works
             </motion.a>
           </motion.div>
         </motion.div>

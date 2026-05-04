@@ -235,8 +235,9 @@ export default function SearchPage() {
                   </div>
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-semibold truncate">{r.title}</p>
-                    <p className="text-[10px] text-text-muted/50 truncate">{r.artist}</p>
+                    <p className="text-[12px] font-bold truncate">{r.artist}</p>
+                    <p className="text-[11px] text-text-muted/60 truncate">{r.title}</p>
+                    <p className="text-[9px] text-accent-purple/50 mt-0.5">Tap to see 50 similar songs</p>
                   </div>
                 </Link>
 
